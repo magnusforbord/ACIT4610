@@ -1,14 +1,17 @@
 import numpy as np
 import pandas as pd
+import os  # Import os module to work with file paths
 
-# Load monthly returns
-monthly_returns = pd.read_csv('monthly_returns.csv', index_col=0)
+# Determine the directory where the script is located
+script_dir = os.path.dirname(os.path.abspath(__file__))
+data_dir = os.path.join(script_dir, 'data')
+
+# Load monthly returns from the new data directory
+monthly_returns = pd.read_csv(os.path.join(data_dir, 'monthly_returns.csv'), index_col=0)
 mean_returns = monthly_returns.mean()
-
 
 def objective_function(weights, mean_returns):
     return np.dot(weights, mean_returns)
-
 
 def initialize_population(pop_size, num_assets):
     population = []
@@ -17,14 +20,12 @@ def initialize_population(pop_size, num_assets):
         population.append(weights)
     return np.array(population)
 
-
 def evaluate_population(population, mean_returns):
     fitness = []
     for weights in population:
         expected_return = objective_function(weights, mean_returns)
         fitness.append(expected_return)
     return np.array(fitness)
-
 
 def mutate(weights, mutation_rate):
     num_assets = len(weights)
@@ -36,7 +37,6 @@ def mutate(weights, mutation_rate):
     mutated_weights = np.abs(mutated_weights)
     mutated_weights /= np.sum(mutated_weights)
     return mutated_weights
-
 
 def select_population(population, fitness, num_selected):
     # Select individuals with the highest fitness
