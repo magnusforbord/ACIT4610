@@ -2,7 +2,7 @@ import yfinance as yf
 import pandas as pd
 
 
-tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', '...']  # Add additional 15 stock tickers
+tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META']  # Add additional 15 stock tickers
 
 data = yf.download(tickers, start='2018-01-01', end='2022-12-31', interval='1d')
 
