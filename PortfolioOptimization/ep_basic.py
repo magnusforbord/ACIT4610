@@ -1,12 +1,12 @@
 import numpy as np
 import pandas as pd
-import os  # Import os module to work with file paths
+import os
 
 # Determine the directory where the script is located
 script_dir = os.path.dirname(os.path.abspath(__file__))
-data_dir = os.path.join(script_dir, 'data')
+data_dir = os.path.join(script_dir, 'data', 'processed')
 
-# Load monthly returns from the new data directory
+# Load monthly returns
 monthly_returns = pd.read_csv(os.path.join(data_dir, 'monthly_returns.csv'), index_col=0)
 mean_returns = monthly_returns.mean()
 
