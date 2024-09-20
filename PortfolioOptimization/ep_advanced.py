@@ -72,7 +72,7 @@ def elitism(population, fitnesses, num_elites):
     elites = [population[i] for i in sorted_indices[:num_elites]]
     return elites
 
-def evolutionary_programming(mean_returns, covariance_matrix, num_assets, pop_size=50, num_generations=100, risk_aversion=0.1, tau=None, tau_prime=None, tournament_size=3, num_elites=2):
+def evolutionary_programming(mean_returns, covariance_matrix, num_assets, pop_size=50, num_generations=100, risk_aversion=3, tau=None, tau_prime=None, tournament_size=3, num_elites=2):
     if tau is None:
         tau = 1 / np.sqrt(2 * np.sqrt(num_assets))
     if tau_prime is None:
@@ -115,7 +115,7 @@ if __name__ == "__main__":
     num_assets = len(mean_returns)
     best_individual, fitness_history = evolutionary_programming(
         mean_returns.values, covariance_matrix, num_assets, 
-        pop_size=50, num_generations=100, risk_aversion=0.1, 
+        pop_size=50, num_generations=100, risk_aversion=10, 
         tournament_size=3, num_elites=2
     )
     # Output the results
