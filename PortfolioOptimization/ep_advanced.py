@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 import os
 import matplotlib.pyplot as plt
+import csv
+import time
 
 # Determine the directory where the script is located
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -12,7 +14,6 @@ monthly_returns = pd.read_csv(os.path.join(data_dir, 'monthly_returns.csv'), ind
 mean_returns = monthly_returns.mean()
 covariance_matrix = pd.read_csv(os.path.join(data_dir, 'covariance_matrix.csv'), index_col=0)
 covariance_matrix = covariance_matrix.values  # Convert to numpy array
-
 
 def fitness_function(weights, mean_returns, covariance_matrix, risk_aversion):
     expected_return = np.dot(weights, mean_returns)
@@ -101,7 +102,8 @@ def evolutionary_programming(mean_returns, covariance_matrix, num_assets, pop_si
         # Record best fitness
         best_fitness = np.max(fitnesses)
         best_fitness_history.append(best_fitness)
-        print(f"Generation {generation}/{num_generations}, Best Fitness: {best_fitness:.6f}")
+        # Optionally, print progress
+        # print(f"Generation {generation}/{num_generations}, Best Fitness: {best_fitness:.6f}")
     # After evolution, select the best individual
     final_fitnesses = []
     for individual in population:
@@ -112,18 +114,53 @@ def evolutionary_programming(mean_returns, covariance_matrix, num_assets, pop_si
     return best_individual, best_fitness_history
 
 if __name__ == "__main__":
+    num_runs = 30  # Number of runs
+    results = []   # List to store results from each run
+
     num_assets = len(mean_returns)
-    best_individual, fitness_history = evolutionary_programming(
-        mean_returns.values, covariance_matrix, num_assets, 
-        pop_size=50, num_generations=100, risk_aversion=10, 
-        tournament_size=3, num_elites=2
-    )
-    # Output the results
-    weights = best_individual['weights']
-    print("\nOptimal Portfolio Weights:")
-    for ticker, weight in zip(mean_returns.index, weights):
-        print(f"{ticker}: {weight:.4f}")
-    expected_return = np.dot(weights, mean_returns.values)
-    portfolio_variance = np.dot(weights.T, np.dot(covariance_matrix, weights))
-    print(f"\nExpected Portfolio Return: {expected_return:.6f}")
-    print(f"Portfolio Variance: {portfolio_variance:.6f}")
+
+    for run in range(1, num_runs + 1):
+        start_time = time.time()
+
+        best_individual, fitness_history = evolutionary_programming(
+            mean_returns.values, covariance_matrix, num_assets, 
+            pop_size=50, num_generations=100, risk_aversion=3, 
+            tournament_size=3, num_elites=2
+        )
+
+        end_time = time.time()
+        training_time = end_time - start_time
+
+        # Collect the results
+        weights = best_individual['weights']
+        expected_return = np.dot(weights, mean_returns.values)
+        portfolio_variance = np.dot(weights.T, np.dot(covariance_matrix, weights))
+        best_fitness = fitness_history[-1]
+
+        # Append results to the list
+        results.append([
+            run,
+            best_fitness,
+            expected_return,
+            portfolio_variance,
+            weights.tolist(),  # Convert numpy array to list for CSV
+            fitness_history,
+            training_time
+        ])
+
+        print(f"Run {run}/{num_runs} completed. Best Fitness: {best_fitness:.6f}")
+
+    # Save results to CSV
+    csv_file_name = 'ep_advanced_results.csv'
+    with open(csv_file_name, mode='w', newline='') as csv_file:
+        writer = csv.writer(csv_file)
+        # Write header
+        writer.writerow([
+            'Run', 'Best Fitness', 'Expected Return', 'Portfolio Variance', 
+            'Weights', 'Fitness History', 'Training Time'
+        ])
+        # Write data rows
+        for result in results:
+            writer.writerow(result)
+
+    print(f"\nAll runs completed. Results saved to '{csv_file_name}'.")
