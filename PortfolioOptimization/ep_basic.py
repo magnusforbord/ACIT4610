@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import os
 import time
+import csv
 
 # Determine the directory where the script is located
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -10,30 +11,24 @@ data_dir = os.path.join(script_dir, 'data', 'processed')
 # Load monthly returns
 monthly_returns = pd.read_csv(os.path.join(data_dir, 'monthly_returns.csv'), index_col=0)
 mean_returns = monthly_returns.mean()
+covariance_matrix = pd.read_csv(os.path.join(data_dir, 'covariance_matrix.csv'), index_col=0)
+covariance_matrix = covariance_matrix.values  # Convert to numpy array
 
 def objective_function(weights, mean_returns):
     """
     Calculate the expected return of the portfolio.
-
-    Parameters:
-    - weights (numpy.ndarray): Portfolio weights.
-    - mean_returns (pandas.Series): Mean returns for each asset.
-
-    Returns:
-    - float: Expected portfolio return.
     """
     return np.dot(weights, mean_returns)
+
+def calculate_portfolio_variance(weights, covariance_matrix):
+    """
+    Calculate the variance of the portfolio.
+    """
+    return np.dot(weights.T, np.dot(covariance_matrix, weights))
 
 def initialize_population(pop_size, num_assets):
     """
     Initialize the population with random weights summing to 1.
-
-    Parameters:
-    - pop_size (int): Population size.
-    - num_assets (int): Number of assets.
-
-    Returns:
-    - numpy.ndarray: Initialized population.
     """
     population = []
     for _ in range(pop_size):
@@ -44,13 +39,6 @@ def initialize_population(pop_size, num_assets):
 def evaluate_population(population, mean_returns):
     """
     Evaluate the fitness of each individual in the population.
-
-    Parameters:
-    - population (numpy.ndarray): Array of individuals (portfolio weights).
-    - mean_returns (pandas.Series): Mean returns for each asset.
-
-    Returns:
-    - numpy.ndarray: Array of fitness values for each individual.
     """
     fitness = []
     for weights in population:
@@ -61,13 +49,6 @@ def evaluate_population(population, mean_returns):
 def mutate(weights, mutation_rate):
     """
     Mutate the portfolio weights.
-
-    Parameters:
-    - weights (numpy.ndarray): Current portfolio weights.
-    - mutation_rate (float): Mutation rate.
-
-    Returns:
-    - numpy.ndarray: Mutated portfolio weights.
     """
     num_assets = len(weights)
     mutated_weights = weights.copy()
@@ -82,31 +63,13 @@ def mutate(weights, mutation_rate):
 def select_population(population, fitness, num_selected):
     """
     Select the top individuals based on fitness.
-
-    Parameters:
-    - population (numpy.ndarray): Current population.
-    - fitness (numpy.ndarray): Fitness values for the population.
-    - num_selected (int): Number of individuals to select.
-
-    Returns:
-    - numpy.ndarray: Selected population.
     """
     indices = np.argsort(fitness)[-num_selected:]
     return population[indices]
 
-def evolutionary_programming(mean_returns, num_assets, pop_size=50, num_generations=100, mutation_rate=0.1):
+def evolutionary_programming(mean_returns, covariance_matrix, num_assets, pop_size=50, num_generations=100, mutation_rate=0.1):
     """
     Basic Evolutionary Programming algorithm for portfolio optimization.
-
-    Parameters:
-    - mean_returns (pandas.Series): Mean returns for each asset.
-    - num_assets (int): Number of assets.
-    - pop_size (int): Population size.
-    - num_generations (int): Number of generations.
-    - mutation_rate (float): Mutation rate.
-
-    Returns:
-    - tuple: Best weights, best return, fitness history.
     """
     # Initialize population
     population = initialize_population(pop_size, num_assets)
@@ -142,17 +105,20 @@ def evolutionary_programming(mean_returns, num_assets, pop_size=50, num_generati
     best_index = np.argmax(final_fitness)
     best_weights = population[best_index]
     best_return = final_fitness[best_index]
-    return best_weights, best_return, fitness_history
+    # Calculate portfolio variance
+    portfolio_variance = calculate_portfolio_variance(best_weights, covariance_matrix)
+    return best_weights, best_return, portfolio_variance, fitness_history
 
 if __name__ == "__main__":
     num_assets = len(mean_returns)
     num_runs = 30  # Number of runs
-    run_results = []
+    results = []
 
     for run in range(1, num_runs + 1):
         start_time = time.time()
-        best_weights, best_return, fitness_history = evolutionary_programming(
-            mean_returns,
+        best_weights, best_return, portfolio_variance, fitness_history = evolutionary_programming(
+            mean_returns.values,
+            covariance_matrix,
             num_assets,
             pop_size=50,
             num_generations=100,
@@ -161,22 +127,30 @@ if __name__ == "__main__":
         end_time = time.time()
         execution_time = end_time - start_time
 
-        # Store the results
-        run_results.append({
-            'Run': run,
-            'Best_Return': best_return,
-            'Best_Weights': best_weights,
-            'Execution_Time': execution_time,
-            'Fitness_History': fitness_history
-        })
+        # Append results to the list
+        results.append([
+            run,
+            best_return,            # Best Fitness (Expected Return)
+            best_return,            # Expected Return
+            portfolio_variance,     # Portfolio Variance
+            best_weights.tolist(),  # Weights
+            fitness_history,        # Fitness History
+            execution_time          # Training Time
+        ])
 
-        print(f"Run {run}/{num_runs} completed. Best Return: {best_return:.6f}")
+        print(f"Run {run}/{num_runs} completed. Best Expected Return: {best_return:.6f}")
 
     # Save results to CSV
-    results_df = pd.DataFrame(run_results)
-    # Convert numpy arrays to strings for CSV storage
-    results_df['Best_Weights'] = results_df['Best_Weights'].apply(lambda x: ','.join(map(str, x)))
-    results_df['Fitness_History'] = results_df['Fitness_History'].apply(lambda x: ','.join(map(str, x)))
-    results_df.to_csv('ep_basic_results.csv', index=False)
+    csv_file_name = 'ep_basic_results.csv'
+    with open(csv_file_name, mode='w', newline='') as csv_file:
+        writer = csv.writer(csv_file)
+        # Write header
+        writer.writerow([
+            'Run', 'Best Fitness', 'Expected Return', 'Portfolio Variance',
+            'Weights', 'Fitness History', 'Training Time'
+        ])
+        # Write data rows
+        for result in results:
+            writer.writerow(result)
 
     print("\nAll runs completed. Results saved to 'ep_basic_results.csv'.")
