@@ -3,6 +3,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
+# Determine the directory where the script is located
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Define the results directory
+results_dir = os.path.join(script_dir, 'results')
+
 # List of algorithms and their result files
 algorithms = {
     'EP Basic': 'ep_basic_results.csv',
@@ -21,13 +27,16 @@ training_times = {}
 
 # Iterate over each algorithm
 for algo_name, file_name in algorithms.items():
+    # Construct the full path to the file in the results folder
+    file_path = os.path.join(results_dir, file_name)
+
     # Check if the file exists
-    if not os.path.exists(file_name):
-        print(f"File {file_name} not found. Skipping {algo_name}.")
+    if not os.path.exists(file_path):
+        print(f"File {file_path} not found. Skipping {algo_name}.")
         continue
     
     # Read the results CSV file
-    data = pd.read_csv(file_name)
+    data = pd.read_csv(file_path)
     
     # Extract data
     expected_returns[algo_name] = data['Expected Return'].values
@@ -62,7 +71,10 @@ for algo_name in algorithms.keys():
 
 summary_df = pd.DataFrame(summary_stats)
 print(summary_df)
-summary_df.to_csv('algorithm_summary_statistics.csv', index=False)
+
+# Save the summary statistics CSV to the results folder
+summary_csv_file = os.path.join(results_dir, 'algorithm_summary_statistics.csv')
+summary_df.to_csv(summary_csv_file, index=False)
 
 # Plot convergence for each algorithm
 plt.figure(figsize=(12, 8))
@@ -77,7 +89,10 @@ plt.xlabel('Generation')
 plt.ylabel('Fitness')
 plt.legend()
 plt.grid(True)
-plt.savefig('convergence_plot.png')
+
+# Save the convergence plot to the results folder
+convergence_plot_file = os.path.join(results_dir, 'convergence_plot.png')
+plt.savefig(convergence_plot_file)
 plt.show()
 
 # Prepare data for boxplot
@@ -91,9 +106,11 @@ plt.ylabel('Expected Return')
 plt.xticks(rotation=45)
 plt.grid(True)
 plt.tight_layout()
-plt.savefig('expected_returns_boxplot.png')
-plt.show()
 
+# Save the boxplot to the results folder
+boxplot_file = os.path.join(results_dir, 'expected_returns_boxplot.png')
+plt.savefig(boxplot_file)
+plt.show()
 
 stability_stats = []
 
@@ -110,4 +127,7 @@ for algo_name in algorithms.keys():
 
 stability_df = pd.DataFrame(stability_stats)
 print(stability_df)
-stability_df.to_csv('algorithm_stability_statistics.csv', index=False)
+
+# Save the stability statistics CSV to the results folder
+stability_csv_file = os.path.join(results_dir, 'algorithm_stability_statistics.csv')
+stability_df.to_csv(stability_csv_file, index=False)

@@ -8,6 +8,10 @@ import time
 script_dir = os.path.dirname(os.path.abspath(__file__))
 data_dir = os.path.join(script_dir, 'data', 'processed')
 
+# Define the results directory
+results_dir = os.path.join(script_dir, 'results')
+os.makedirs(results_dir, exist_ok=True)
+
 # Load monthly returns
 monthly_returns = pd.read_csv(os.path.join(data_dir, 'monthly_returns.csv'), index_col=0)
 mean_returns = monthly_returns.mean()
@@ -123,7 +127,7 @@ if __name__ == "__main__":
         print(f"Run {run}/{num_runs} completed. Best Expected Return: {best_return:.6f}")
 
     # Save results to CSV
-    csv_file_name = 'es_mu_comma_lambda_results.csv'
+    csv_file_name = os.path.join(results_dir, 'es_mu_comma_lambda_results.csv')
     with open(csv_file_name, mode='w', newline='') as csv_file:
         writer = csv.writer(csv_file)
         # Write header
