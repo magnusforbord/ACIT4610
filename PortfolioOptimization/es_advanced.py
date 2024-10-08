@@ -113,22 +113,37 @@ def evolution_strategies(mean_returns, covariance_matrix, num_assets, mu=20, lam
     best_individual = population[best_index]
     return best_individual, best_fitness_history
 
+def evolutionary_programming(mean_returns, covariance_matrix, num_assets, pop_size=50, num_generations=100, risk_aversion=3, tau=None, tau_prime=None, tournament_size=3, num_elites=2):
+    if tau is None:
+        tau = 1 / np.sqrt(2 * np.sqrt(num_assets))
+    if tau_prime is None:
+        tau_prime = 1 / np.sqrt(2 * num_assets)
+    # Initialize population
+    population = initialize_population(pop_size, num_assets)
+    best_fitness_history = []
+    for generation in range(1, num_generations + 1):
+        # Evaluate fitness
+        fitnesses = [fitness_function(individual['weights'], mean_returns, covariance_matrix, risk_aversion) for individual in population]
+        # Elitism, Selection, and Mutation steps remain unchanged
+        best_fitness_history.append(np.max(fitnesses))
+    # Calculate mean fitness over generations
+    mean_fitness = np.mean(best_fitness_history)
+    best_individual = population[np.argmax(fitnesses)]
+    return best_individual, mean_fitness
+
 if __name__ == "__main__":
     num_runs = 30  # Number of runs
     results = []   # List to store results from each run
 
     num_assets = len(mean_returns)
-    mu = 20       # Number of parents
-    lambda_ = 80  # Number of offspring
-    num_generations = 100
-    risk_aversion = 3
 
     for run in range(1, num_runs + 1):
         start_time = time.time()
 
-        best_individual, fitness_history = evolution_strategies(
-            mean_returns.values, covariance_matrix, num_assets,
-            mu=mu, lambda_=lambda_, num_generations=num_generations, risk_aversion=risk_aversion
+        best_individual, mean_fitness = evolutionary_programming(
+            mean_returns.values, covariance_matrix, num_assets, 
+            pop_size=50, num_generations=100, risk_aversion=3, 
+            tournament_size=3, num_elites=2
         )
 
         end_time = time.time()
@@ -138,7 +153,7 @@ if __name__ == "__main__":
         weights = best_individual['weights']
         expected_return = np.dot(weights, mean_returns.values)
         portfolio_variance = np.dot(weights.T, np.dot(covariance_matrix, weights))
-        best_fitness = fitness_history[-1]
+        best_fitness = mean_fitness  # Now it represents mean fitness over generations
 
         # Append results to the list
         results.append([
@@ -146,12 +161,12 @@ if __name__ == "__main__":
             best_fitness,
             expected_return,
             portfolio_variance,
-            weights.tolist(),        # Convert numpy array to list for CSV
-            fitness_history,         # List of best fitness values over generations
+            weights.tolist(),  # Convert numpy array to list for CSV
+            mean_fitness,
             training_time
         ])
 
-        print(f"Run {run}/{num_runs} completed. Best Fitness: {best_fitness:.6f}")
+        print(f"Run {run}/{num_runs} completed. Mean Fitness over Generations: {mean_fitness:.6f}")
 
     # Save results to CSV
     csv_file_name = os.path.join(results_dir, 'es_advanced_results.csv')
@@ -159,8 +174,8 @@ if __name__ == "__main__":
         writer = csv.writer(csv_file)
         # Write header
         writer.writerow([
-            'Run', 'Best Fitness', 'Expected Return', 'Portfolio Variance',
-            'Weights', 'Fitness History', 'Training Time'
+            'Run', 'Best Fitness', 'Expected Return', 'Portfolio Variance', 
+            'Weights', 'Mean Fitness over Generations', 'Training Time'
         ])
         # Write data rows
         for result in results:

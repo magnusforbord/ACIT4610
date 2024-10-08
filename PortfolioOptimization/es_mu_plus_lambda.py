@@ -52,55 +52,44 @@ def evolution_strategies_mu_plus_lambda(mean_returns, covariance_matrix, num_ass
     best_fitness_history = []
 
     for generation in range(num_generations):
-        # Generate offspring
         offspring = []
         for _ in range(lambda_):
-            # Select a parent randomly
             parent_idx = np.random.randint(0, mu)
             parent = population[parent_idx]
-            # Mutate to create an offspring
             child = mutate(parent, mutation_strength)
             offspring.append(child)
         offspring = np.array(offspring)
 
-        # Combine parents and offspring
         combined_population = np.vstack((population, offspring))
-
-        # Evaluate fitness
         fitness = evaluate_population(combined_population, mean_returns)
 
-        # Select the best μ individuals
         indices = np.argsort(fitness)[-mu:]
         population = combined_population[indices]
 
-        # Record best fitness
         best_fitness = fitness[indices[-1]]
         best_fitness_history.append(best_fitness)
 
-        # Optionally, print progress
-        # print(f"Generation {generation+1}/{num_generations}, Best Expected Return: {best_fitness:.6f}")
-
-    # After the final generation, return the best solution
+    mean_fitness = np.mean(best_fitness_history)
     final_fitness = evaluate_population(population, mean_returns)
     best_index = np.argmax(final_fitness)
     best_weights = population[best_index]
     best_return = final_fitness[best_index]
-    return best_weights, best_return, best_fitness_history
+    return best_weights, best_return, mean_fitness
 
 if __name__ == "__main__":
-    num_runs = 30  # Number of runs
-    results = []   # List to store results from each run
+    num_runs = 30
+    results = []
 
     num_assets = len(mean_returns)
-    mu = 20       # Number of parents
-    lambda_ = 80  # Number of offspring
+    mu = 20
+    lambda_ = 80
     num_generations = 100
     mutation_strength = 0.05
 
     for run in range(1, num_runs + 1):
         start_time = time.time()
 
-        best_weights, best_return, fitness_history = evolution_strategies_mu_plus_lambda(
+        best_weights, best_return, mean_fitness = evolution_strategies_mu_plus_lambda(
             mean_returns.values,
             covariance_matrix,
             num_assets,
@@ -113,32 +102,26 @@ if __name__ == "__main__":
         end_time = time.time()
         training_time = end_time - start_time
 
-        # Calculate portfolio variance for the best weights
         portfolio_variance = calculate_portfolio_variance(best_weights, covariance_matrix)
 
-        # Append results to the list
         results.append([
             run,
-            best_return,
+            mean_fitness,
             best_return,
             portfolio_variance,
-            best_weights.tolist(),   # Convert numpy array to list for CSV
-            fitness_history,         # List of best fitness values over generations
+            best_weights.tolist(),  # Convert numpy array to list for CSV
             training_time
         ])
 
-        print(f"Run {run}/{num_runs} completed. Best Expected Return: {best_return:.6f}")
+        print(f"Run {run}/{num_runs} completed. Mean Fitness: {mean_fitness:.6f}")
 
-    # Save results to CSV
     csv_file_name = os.path.join(results_dir, 'es_mu_plus_lambda_results.csv')
     with open(csv_file_name, mode='w', newline='') as csv_file:
         writer = csv.writer(csv_file)
-        # Write header
         writer.writerow([
-            'Run', 'Best Fitness', 'Expected Return', 'Portfolio Variance',
-            'Weights', 'Fitness History', 'Training Time'
+            'Run', 'Mean Fitness', 'Expected Return', 'Portfolio Variance',
+            'Weights', 'Training Time'
         ])
-        # Write data rows
         for result in results:
             writer.writerow(result)
 

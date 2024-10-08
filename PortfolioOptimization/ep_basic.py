@@ -71,6 +71,29 @@ def select_population(population, fitness, num_selected):
     indices = np.argsort(fitness)[-num_selected:]
     return population[indices]
 
+import numpy as np
+import pandas as pd
+import os
+import time
+import csv
+
+# Determine the directory where the script is located
+script_dir = os.path.dirname(os.path.abspath(__file__))
+data_dir = os.path.join(script_dir, 'data', 'processed')
+
+# Define the results directory
+results_dir = os.path.join(script_dir, 'results')
+os.makedirs(results_dir, exist_ok=True)
+
+# Load monthly returns
+monthly_returns = pd.read_csv(os.path.join(data_dir, 'monthly_returns.csv'), index_col=0)
+mean_returns = monthly_returns.mean()
+covariance_matrix = pd.read_csv(os.path.join(data_dir, 'covariance_matrix.csv'), index_col=0)
+covariance_matrix = covariance_matrix.values  # Convert to numpy array
+
+# (Define your functions for objective_function, calculate_portfolio_variance, initialize_population, 
+# evaluate_population, mutate, and select_population here...)
+
 def evolutionary_programming(mean_returns, covariance_matrix, num_assets, pop_size=50, num_generations=100, mutation_rate=0.1):
     """
     Basic Evolutionary Programming algorithm for portfolio optimization.
@@ -84,10 +107,7 @@ def evolutionary_programming(mean_returns, covariance_matrix, num_assets, pop_si
         fitness = evaluate_population(population, mean_returns)
 
         # Generate offspring through mutation
-        offspring = []
-        for individual in population:
-            mutated_individual = mutate(individual, mutation_rate)
-            offspring.append(mutated_individual)
+        offspring = [mutate(individual, mutation_rate) for individual in population]
         offspring = np.array(offspring)
 
         # Evaluate fitness of offspring
@@ -100,9 +120,9 @@ def evolutionary_programming(mean_returns, covariance_matrix, num_assets, pop_si
         # Select the next generation
         population = select_population(combined_population, combined_fitness, pop_size)
 
-        # Record the best fitness
-        best_fitness = np.max(combined_fitness)
-        fitness_history.append(best_fitness)
+        # Record the mean fitness for this generation
+        mean_fitness = np.mean(combined_fitness)
+        fitness_history.append(mean_fitness)
 
     # After the final generation, return the best solution
     final_fitness = evaluate_population(population, mean_returns)
@@ -111,7 +131,8 @@ def evolutionary_programming(mean_returns, covariance_matrix, num_assets, pop_si
     best_return = final_fitness[best_index]
     # Calculate portfolio variance
     portfolio_variance = calculate_portfolio_variance(best_weights, covariance_matrix)
-    return best_weights, best_return, portfolio_variance, fitness_history
+    mean_fitness_over_generations = np.mean(fitness_history)  # Calculate mean fitness over all generations
+    return best_weights, best_return, portfolio_variance, mean_fitness_over_generations
 
 if __name__ == "__main__":
     num_assets = len(mean_returns)
@@ -120,7 +141,7 @@ if __name__ == "__main__":
 
     for run in range(1, num_runs + 1):
         start_time = time.time()
-        best_weights, best_return, portfolio_variance, fitness_history = evolutionary_programming(
+        best_weights, best_return, portfolio_variance, mean_fitness_over_generations = evolutionary_programming(
             mean_returns.values,
             covariance_matrix,
             num_assets,
@@ -134,12 +155,12 @@ if __name__ == "__main__":
         # Append results to the list
         results.append([
             run,
-            best_return,            # Best Fitness (Expected Return)
-            best_return,            # Expected Return
-            portfolio_variance,     # Portfolio Variance
-            best_weights.tolist(),  # Weights
-            fitness_history,        # Fitness History
-            execution_time          # Training Time
+            best_return,                # Best Fitness (Expected Return)
+            best_return,                # Expected Return
+            portfolio_variance,         # Portfolio Variance
+            best_weights.tolist(),      # Weights
+            mean_fitness_over_generations,  # Mean Fitness over Generations
+            execution_time              # Training Time
         ])
 
         print(f"Run {run}/{num_runs} completed. Best Expected Return: {best_return:.6f}")
@@ -151,7 +172,7 @@ if __name__ == "__main__":
         # Write header
         writer.writerow([
             'Run', 'Best Fitness', 'Expected Return', 'Portfolio Variance',
-            'Weights', 'Fitness History', 'Training Time'
+            'Weights', 'Mean Fitness over Generations', 'Training Time'
         ])
         # Write data rows
         for result in results:

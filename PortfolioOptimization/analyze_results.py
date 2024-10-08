@@ -22,35 +22,23 @@ algorithms = {
 # Initialize dictionaries to store metrics
 expected_returns = {}
 portfolio_variances = {}
-fitness_histories = {}
 training_times = {}
 
 # Iterate over each algorithm
 for algo_name, file_name in algorithms.items():
-    # Construct the full path to the file in the results folder
     file_path = os.path.join(results_dir, file_name)
-
-    # Check if the file exists
     if not os.path.exists(file_path):
         print(f"File {file_path} not found. Skipping {algo_name}.")
         continue
     
-    # Read the results CSV file
     data = pd.read_csv(file_path)
     
-    # Extract data
     expected_returns[algo_name] = data['Expected Return'].values
     portfolio_variances[algo_name] = data['Portfolio Variance'].values
     training_times[algo_name] = data['Training Time'].values
-    
-    # Convert fitness history strings to lists
-    fitness_history_lists = data['Fitness History'].apply(eval).tolist()
-    # Convert to a 2D NumPy array
-    fitness_history_array = np.array(fitness_history_lists)
-    fitness_histories[algo_name] = fitness_history_array
 
+# Calculate summary statistics for all algorithms
 summary_stats = []
-
 for algo_name in algorithms.keys():
     mean_return = np.mean(expected_returns[algo_name])
     std_return = np.std(expected_returns[algo_name])
@@ -71,34 +59,12 @@ for algo_name in algorithms.keys():
 
 summary_df = pd.DataFrame(summary_stats)
 print(summary_df)
-
-# Save the summary statistics CSV to the results folder
 summary_csv_file = os.path.join(results_dir, 'algorithm_summary_statistics.csv')
 summary_df.to_csv(summary_csv_file, index=False)
 
-# Plot convergence for each algorithm
-plt.figure(figsize=(12, 8))
-
-for algo_name in algorithms.keys():
-    fitness_array = fitness_histories[algo_name]
-    avg_fitness_over_generations = np.mean(fitness_array, axis=0)
-    plt.plot(avg_fitness_over_generations, label=algo_name)
-
-plt.title('Average Fitness Convergence Over Generations')
-plt.xlabel('Generation')
-plt.ylabel('Fitness')
-plt.legend()
-plt.grid(True)
-
-# Save the convergence plot to the results folder
-convergence_plot_file = os.path.join(results_dir, 'convergence_plot.png')
-plt.savefig(convergence_plot_file)
-plt.show()
-
-# Prepare data for boxplot
+# Boxplot for expected returns across all algorithms
 returns_data = [expected_returns[algo_name] for algo_name in algorithms.keys()]
 labels = list(algorithms.keys())
-
 plt.figure(figsize=(12, 8))
 plt.boxplot(returns_data, tick_labels=labels)
 plt.title('Distribution of Expected Returns Across Algorithms')
@@ -107,13 +73,12 @@ plt.xticks(rotation=45)
 plt.grid(True)
 plt.tight_layout()
 
-# Save the boxplot to the results folder
 boxplot_file = os.path.join(results_dir, 'expected_returns_boxplot.png')
 plt.savefig(boxplot_file)
 plt.show()
 
+# Stability Statistics Calculation
 stability_stats = []
-
 for algo_name in algorithms.keys():
     mean_return = np.mean(expected_returns[algo_name])
     std_return = np.std(expected_returns[algo_name])
@@ -127,7 +92,5 @@ for algo_name in algorithms.keys():
 
 stability_df = pd.DataFrame(stability_stats)
 print(stability_df)
-
-# Save the stability statistics CSV to the results folder
 stability_csv_file = os.path.join(results_dir, 'algorithm_stability_statistics.csv')
 stability_df.to_csv(stability_csv_file, index=False)
