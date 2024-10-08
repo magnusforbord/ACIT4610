@@ -66,7 +66,15 @@ means_df = calculate_means(combined_results)
 # --- Visualization 1: Mean Fitness Comparison ---
 
 plt.figure(figsize=(10, 6))
-sns.barplot(data=means_df, x='Algorithm', y='Mean Fitness', palette='viridis')
+sns.barplot(
+    data=means_df,
+    x='Algorithm',
+    y='Mean Fitness',
+    hue='Algorithm',
+    dodge=False,
+    palette='viridis'
+)
+plt.legend([],[], frameon=False)
 plt.title('Mean Fitness Comparison')
 plt.xticks(rotation=45)
 plt.tight_layout()
@@ -76,7 +84,15 @@ plt.show()
 # --- Visualization 1a: Best Fitness Comparison ---
 
 plt.figure(figsize=(10, 6))
-sns.barplot(data=means_df, x='Algorithm', y='Best Fitness', palette='coolwarm')
+sns.barplot(
+    data=means_df,
+    x='Algorithm',
+    y='Best Fitness',
+    hue='Algorithm',
+    dodge=False,
+    palette='coolwarm'
+)
+plt.legend([],[], frameon=False)  # Hide the legend if not needed
 plt.title('Best Fitness Comparison')
 plt.xticks(rotation=45)
 plt.tight_layout()
@@ -133,7 +149,16 @@ plt.show()
 # --- Visualization 4: Training Time Comparison ---
 
 plt.figure(figsize=(10, 6))
-sns.barplot(data=means_df, x='Algorithm', y='Training Time', palette='magma')
+sns.barplot(
+    data=means_df,
+    x='Algorithm',
+    y='Training Time',
+    hue='Algorithm',
+    dodge=False,
+    palette='magma'
+)
+plt.legend([],[], frameon=False)  # Hide the legend if not needed
+
 plt.title('Average Training Time Comparison')
 plt.xticks(rotation=45)
 plt.ylabel('Training Time (seconds)')
