@@ -14,9 +14,8 @@ os.makedirs(results_dir, exist_ok=True)
 
 # Load monthly returns
 monthly_returns = pd.read_csv(os.path.join(data_dir, 'monthly_returns.csv'), index_col=0)
-mean_returns = monthly_returns.mean()
-covariance_matrix = pd.read_csv(os.path.join(data_dir, 'covariance_matrix.csv'), index_col=0)
-covariance_matrix = covariance_matrix.values  # Convert to numpy array
+mean_returns = monthly_returns.mean().values  # Convert to numpy array
+covariance_matrix = pd.read_csv(os.path.join(data_dir, 'covariance_matrix.csv'), index_col=0).values
 
 def fitness_function(weights, mean_returns, covariance_matrix, risk_aversion):
     expected_return = np.dot(weights, mean_returns)
@@ -78,6 +77,8 @@ def evolution_strategies(mean_returns, covariance_matrix, num_assets, mu=20, lam
     # Initialize population
     population = initialize_population(mu, num_assets)
     best_fitness_history = []
+    mean_fitness_history = []
+
     for generation in range(1, num_generations + 1):
         # Generate offspring
         offspring = []
@@ -92,92 +93,79 @@ def evolution_strategies(mean_returns, covariance_matrix, num_assets, mu=20, lam
         # Combine parents and offspring
         combined_population = population + offspring
         # Evaluate fitness
-        fitnesses = []
-        for individual in combined_population:
-            fitness = fitness_function(individual['weights'], mean_returns, covariance_matrix, risk_aversion)
-            fitnesses.append(fitness)
-        fitnesses = np.array(fitnesses)
+        fitnesses = np.array([
+            fitness_function(individual['weights'], mean_returns, covariance_matrix, risk_aversion)
+            for individual in combined_population
+        ])
+        # Record best and mean fitness
+        best_fitness = np.max(fitnesses)
+        mean_fitness = np.mean(fitnesses)
+        best_fitness_history.append(best_fitness)
+        mean_fitness_history.append(mean_fitness)
         # Select the next generation
         population = select_population(combined_population, fitnesses, mu)
-        # Record best fitness
-        best_fitness = np.max(fitnesses)
-        best_fitness_history.append(best_fitness)
         # Optionally, print progress
         # print(f"Generation {generation}/{num_generations}, Best Fitness: {best_fitness:.6f}")
     # After evolution, select the best individual
-    final_fitnesses = []
-    for individual in population:
-        fitness = fitness_function(individual['weights'], mean_returns, covariance_matrix, risk_aversion)
-        final_fitnesses.append(fitness)
+    final_fitnesses = np.array([
+        fitness_function(individual['weights'], mean_returns, covariance_matrix, risk_aversion)
+        for individual in population
+    ])
     best_index = np.argmax(final_fitnesses)
     best_individual = population[best_index]
-    return best_individual, best_fitness_history
+    best_fitness = final_fitnesses[best_index]
+    mean_fitness_final_gen = np.mean(final_fitnesses)
 
-def evolutionary_programming(mean_returns, covariance_matrix, num_assets, pop_size=50, num_generations=100, risk_aversion=3, tau=None, tau_prime=None, tournament_size=3, num_elites=2):
-    if tau is None:
-        tau = 1 / np.sqrt(2 * np.sqrt(num_assets))
-    if tau_prime is None:
-        tau_prime = 1 / np.sqrt(2 * num_assets)
-    # Initialize population
-    population = initialize_population(pop_size, num_assets)
-    best_fitness_history = []
-    for generation in range(1, num_generations + 1):
-        # Evaluate fitness
-        fitnesses = [fitness_function(individual['weights'], mean_returns, covariance_matrix, risk_aversion) for individual in population]
-        # Elitism, Selection, and Mutation steps remain unchanged
-        best_fitness_history.append(np.max(fitnesses))
-    # Calculate mean fitness over generations
-    mean_fitness = np.mean(best_fitness_history)
-    best_individual = population[np.argmax(fitnesses)]
-    return best_individual, mean_fitness
+    return best_individual, best_fitness, mean_fitness_final_gen
 
 if __name__ == "__main__":
     num_runs = 30  # Number of runs
     results = []   # List to store results from each run
 
     num_assets = len(mean_returns)
+    mu = 20
+    lambda_ = 80
+    num_generations = 100
 
     for run in range(1, num_runs + 1):
         start_time = time.time()
 
-        best_individual, mean_fitness = evolutionary_programming(
-            mean_returns.values, covariance_matrix, num_assets, 
-            pop_size=50, num_generations=100, risk_aversion=3, 
-            tournament_size=3, num_elites=2
+        best_individual, best_fitness, mean_fitness = evolution_strategies(
+            mean_returns,
+            covariance_matrix,
+            num_assets,
+            mu=mu,
+            lambda_=lambda_,
+            num_generations=num_generations,
+            risk_aversion=3
         )
 
         end_time = time.time()
         training_time = end_time - start_time
 
-        # Collect the results
         weights = best_individual['weights']
-        expected_return = np.dot(weights, mean_returns.values)
+        expected_return = np.dot(weights, mean_returns)
         portfolio_variance = np.dot(weights.T, np.dot(covariance_matrix, weights))
-        best_fitness = mean_fitness  # Now it represents mean fitness over generations
 
-        # Append results to the list
         results.append([
             run,
             best_fitness,
+            mean_fitness,
             expected_return,
             portfolio_variance,
-            weights.tolist(),  # Convert numpy array to list for CSV
-            mean_fitness,
+            weights.tolist(),
             training_time
         ])
 
-        print(f"Run {run}/{num_runs} completed. Mean Fitness over Generations: {mean_fitness:.6f}")
+        print(f"Run {run}/{num_runs} completed. Best Fitness: {best_fitness:.6f}")
 
-    # Save results to CSV
     csv_file_name = os.path.join(results_dir, 'es_advanced_results.csv')
     with open(csv_file_name, mode='w', newline='') as csv_file:
         writer = csv.writer(csv_file)
-        # Write header
         writer.writerow([
-            'Run', 'Best Fitness', 'Expected Return', 'Portfolio Variance', 
-            'Weights', 'Mean Fitness over Generations', 'Training Time'
+            'Run', 'Best Fitness', 'Mean Fitness', 'Expected Return', 'Portfolio Variance',
+            'Weights', 'Training Time'
         ])
-        # Write data rows
         for result in results:
             writer.writerow(result)
 

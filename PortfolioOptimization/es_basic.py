@@ -14,13 +14,11 @@ os.makedirs(results_dir, exist_ok=True)
 
 # Load monthly returns
 monthly_returns = pd.read_csv(os.path.join(data_dir, 'monthly_returns.csv'), index_col=0)
-mean_returns = monthly_returns.mean()
-covariance_matrix = pd.read_csv(os.path.join(data_dir, 'covariance_matrix.csv'), index_col=0)
-covariance_matrix = covariance_matrix.values  # Convert to numpy array
+mean_returns = monthly_returns.mean().values  # Convert to numpy array
+covariance_matrix = pd.read_csv(os.path.join(data_dir, 'covariance_matrix.csv'), index_col=0).values
 
 def objective_function(weights, mean_returns):
-    expected_return = np.dot(weights, mean_returns)
-    return expected_return
+    return np.dot(weights, mean_returns)
 
 def calculate_portfolio_variance(weights, covariance_matrix):
     return np.dot(weights.T, np.dot(covariance_matrix, weights))
@@ -28,16 +26,13 @@ def calculate_portfolio_variance(weights, covariance_matrix):
 def initialize_population(pop_size, num_assets):
     population = []
     for _ in range(pop_size):
-        weights = np.random.dirichlet(np.ones(num_assets), size=1)[0]
+        weights = np.random.dirichlet(np.ones(num_assets))
         population.append(weights)
     return np.array(population)
 
 def evaluate_population(population, mean_returns):
-    fitness = []
-    for weights in population:
-        expected_return = objective_function(weights, mean_returns)
-        fitness.append(expected_return)
-    return np.array(fitness)
+    fitness = np.array([objective_function(weights, mean_returns) for weights in population])
+    return fitness
 
 def mutate(weights, mutation_strength):
     num_assets = len(weights)
@@ -54,6 +49,7 @@ def evolution_strategies(mean_returns, covariance_matrix, num_assets, pop_size=5
     # Initialize population
     population = initialize_population(μ, num_assets)
     best_fitness_history = []
+    mean_fitness_history = []
 
     for generation in range(num_generations):
         # Generate offspring
@@ -70,18 +66,23 @@ def evolution_strategies(mean_returns, covariance_matrix, num_assets, pop_size=5
         indices = np.argsort(fitness)[-μ:]
         population = combined_population[indices]
 
-        # Record best fitness of the generation
+        # Record best and mean fitness of the generation
         best_fitness = fitness[indices[-1]]
+        mean_fitness = np.mean(fitness)
         best_fitness_history.append(best_fitness)
+        mean_fitness_history.append(mean_fitness)
 
-    # Calculate mean fitness over generations
-    mean_fitness = np.mean(best_fitness_history)
+    # After evolution, get the best individual
     final_fitness = evaluate_population(population, mean_returns)
     best_index = np.argmax(final_fitness)
     best_weights = population[best_index]
     best_return = final_fitness[best_index]
+    # Calculate portfolio variance
+    portfolio_variance = calculate_portfolio_variance(best_weights, covariance_matrix)
+    # Mean fitness of the final generation
+    mean_fitness_final_gen = np.mean(final_fitness)
 
-    return best_weights, best_return, mean_fitness
+    return best_weights, best_return, portfolio_variance, best_fitness, mean_fitness_final_gen
 
 if __name__ == "__main__":
     num_runs = 30  # Number of runs
@@ -92,8 +93,8 @@ if __name__ == "__main__":
     for run in range(1, num_runs + 1):
         start_time = time.time()
 
-        best_weights, best_return, mean_fitness = evolution_strategies(
-            mean_returns.values,
+        best_weights, expected_return, portfolio_variance, best_fitness, mean_fitness = evolution_strategies(
+            mean_returns,
             covariance_matrix,
             num_assets,
             pop_size=50,
@@ -104,21 +105,18 @@ if __name__ == "__main__":
         end_time = time.time()
         training_time = end_time - start_time
 
-        # Calculate portfolio variance for the best weights
-        portfolio_variance = calculate_portfolio_variance(best_weights, covariance_matrix)
-
         # Collect the results
         results.append([
             run,
-            mean_fitness,  # Store mean fitness instead of entire history
-            best_return,
+            best_fitness,           # Best Fitness
+            mean_fitness,           # Mean Fitness of final generation
+            expected_return,
             portfolio_variance,
             best_weights.tolist(),  # Convert numpy array to list for CSV
-            mean_fitness,  # Store mean fitness over generations
             training_time
         ])
 
-        print(f"Run {run}/{num_runs} completed. Mean Fitness over Generations: {mean_fitness:.6f}")
+        print(f"Run {run}/{num_runs} completed. Best Fitness: {best_fitness:.6f}")
 
     # Save results to CSV
     csv_file_name = os.path.join(results_dir, 'es_basic_results.csv')
@@ -126,8 +124,8 @@ if __name__ == "__main__":
         writer = csv.writer(csv_file)
         # Write header
         writer.writerow([
-            'Run', 'Mean Fitness', 'Expected Return', 'Portfolio Variance',
-            'Weights', 'Mean Fitness over Generations', 'Training Time'
+            'Run', 'Best Fitness', 'Mean Fitness', 'Expected Return', 'Portfolio Variance',
+            'Weights', 'Training Time'
         ])
         # Write data rows
         for result in results:

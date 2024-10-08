@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
 import os
-import csv
 import time
+import csv
 
 # Determine the directory where the script is located
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -14,9 +14,8 @@ os.makedirs(results_dir, exist_ok=True)
 
 # Load monthly returns
 monthly_returns = pd.read_csv(os.path.join(data_dir, 'monthly_returns.csv'), index_col=0)
-mean_returns = monthly_returns.mean()
-covariance_matrix = pd.read_csv(os.path.join(data_dir, 'covariance_matrix.csv'), index_col=0)
-covariance_matrix = covariance_matrix.values  # Convert to numpy array
+mean_returns = monthly_returns.mean().values  # Convert to numpy array
+covariance_matrix = pd.read_csv(os.path.join(data_dir, 'covariance_matrix.csv'), index_col=0).values
 
 def fitness_function(weights, mean_returns, covariance_matrix, risk_aversion):
     expected_return = np.dot(weights, mean_returns)
@@ -70,20 +69,33 @@ def evolutionary_programming(mean_returns, covariance_matrix, num_assets, pop_si
         tau_prime = 1 / np.sqrt(2 * num_assets)
     population = initialize_population(pop_size, num_assets)
     best_fitness_history = []
+    mean_fitness_history = []
 
     for generation in range(1, num_generations + 1):
         fitnesses = np.array([fitness_function(ind['weights'], mean_returns, covariance_matrix, risk_aversion) for ind in population])
-        elites = elitism(population, fitnesses, num_elites)
-        selected_population = tournament_selection(population, fitnesses, tournament_size)
-        offspring = [mutate(ind.copy(), tau, tau_prime) for ind in selected_population]
-        population = elites + offspring[:pop_size - num_elites]
+        # Record best and mean fitness for this generation
         best_fitness = np.max(fitnesses)
+        mean_fitness = np.mean(fitnesses)
         best_fitness_history.append(best_fitness)
+        mean_fitness_history.append(mean_fitness)
 
-    mean_fitness = np.mean(best_fitness_history)
-    final_fitnesses = [fitness_function(ind['weights'], mean_returns, covariance_matrix, risk_aversion) for ind in population]
-    best_individual = population[np.argmax(final_fitnesses)]
-    return best_individual, mean_fitness
+        # Elitism
+        elites = elitism(population, fitnesses, num_elites)
+        # Selection
+        selected_population = tournament_selection(population, fitnesses, tournament_size)
+        # Mutation
+        offspring = [mutate(ind.copy(), tau, tau_prime) for ind in selected_population]
+        # Create new population
+        population = elites + offspring[:pop_size - num_elites]
+
+    # After evolution, select the best individual
+    final_fitnesses = np.array([fitness_function(ind['weights'], mean_returns, covariance_matrix, risk_aversion) for ind in population])
+    best_index = np.argmax(final_fitnesses)
+    best_individual = population[best_index]
+    best_fitness = final_fitnesses[best_index]
+    mean_fitness_final_gen = np.mean(final_fitnesses)
+
+    return best_individual, best_fitness, mean_fitness_final_gen
 
 if __name__ == "__main__":
     num_runs = 30
@@ -94,9 +106,9 @@ if __name__ == "__main__":
     for run in range(1, num_runs + 1):
         start_time = time.time()
 
-        best_individual, mean_fitness = evolutionary_programming(
-            mean_returns.values, covariance_matrix, num_assets, 
-            pop_size=50, num_generations=100, risk_aversion=3, 
+        best_individual, best_fitness, mean_fitness = evolutionary_programming(
+            mean_returns, covariance_matrix, num_assets,
+            pop_size=50, num_generations=100, risk_aversion=3,
             tournament_size=3, num_elites=2
         )
 
@@ -104,25 +116,26 @@ if __name__ == "__main__":
         training_time = end_time - start_time
 
         weights = best_individual['weights']
-        expected_return = np.dot(weights, mean_returns.values)
+        expected_return = np.dot(weights, mean_returns)
         portfolio_variance = np.dot(weights.T, np.dot(covariance_matrix, weights))
 
         results.append([
             run,
-            mean_fitness,
-            expected_return,
-            portfolio_variance,
+            best_fitness,           # Best Fitness
+            mean_fitness,           # Mean Fitness of final generation
+            expected_return,        # Expected Return
+            portfolio_variance,     # Portfolio Variance
             weights.tolist(),
             training_time
         ])
 
-        print(f"Run {run}/{num_runs} completed. Mean Fitness: {mean_fitness:.6f}")
+        print(f"Run {run}/{num_runs} completed. Best Fitness: {best_fitness:.6f}")
 
     csv_file_name = os.path.join(results_dir, 'ep_advanced_results.csv')
     with open(csv_file_name, mode='w', newline='') as csv_file:
         writer = csv.writer(csv_file)
         writer.writerow([
-            'Run', 'Mean Fitness', 'Expected Return', 'Portfolio Variance', 
+            'Run', 'Best Fitness', 'Mean Fitness', 'Expected Return', 'Portfolio Variance',
             'Weights', 'Training Time'
         ])
         for result in results:

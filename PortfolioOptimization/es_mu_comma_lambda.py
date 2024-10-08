@@ -14,9 +14,8 @@ os.makedirs(results_dir, exist_ok=True)
 
 # Load monthly returns
 monthly_returns = pd.read_csv(os.path.join(data_dir, 'monthly_returns.csv'), index_col=0)
-mean_returns = monthly_returns.mean()
-covariance_matrix = pd.read_csv(os.path.join(data_dir, 'covariance_matrix.csv'), index_col=0)
-covariance_matrix = covariance_matrix.values  # Convert to numpy array
+mean_returns = monthly_returns.mean().values  # Convert to numpy array
+covariance_matrix = pd.read_csv(os.path.join(data_dir, 'covariance_matrix.csv'), index_col=0).values
 
 def objective_function(weights, mean_returns):
     return np.dot(weights, mean_returns)
@@ -32,11 +31,8 @@ def initialize_population(pop_size, num_assets):
     return np.array(population)
 
 def evaluate_population(population, mean_returns):
-    fitness = []
-    for weights in population:
-        expected_return = objective_function(weights, mean_returns)
-        fitness.append(expected_return)
-    return np.array(fitness)
+    fitness = np.array([objective_function(weights, mean_returns) for weights in population])
+    return fitness
 
 def mutate(weights, mutation_strength):
     num_assets = len(weights)
@@ -50,6 +46,7 @@ def evolution_strategies_mu_comma_lambda(mean_returns, covariance_matrix, num_as
     # Initialize population of parents
     population = initialize_population(mu, num_assets)
     best_fitness_history = []
+    mean_fitness_history = []
 
     for generation in range(num_generations):
         offspring = []
@@ -61,18 +58,24 @@ def evolution_strategies_mu_comma_lambda(mean_returns, covariance_matrix, num_as
         offspring = np.array(offspring)
 
         fitness_offspring = evaluate_population(offspring, mean_returns)
+
+        # Select the best μ offspring
         indices = np.argsort(fitness_offspring)[-mu:]
         population = offspring[indices]
 
+        # Record best and mean fitness
         best_fitness = fitness_offspring[indices[-1]]
+        mean_fitness = np.mean(fitness_offspring)
         best_fitness_history.append(best_fitness)
+        mean_fitness_history.append(mean_fitness)
 
-    mean_fitness = np.mean(best_fitness_history)
+    mean_fitness_final_gen = mean_fitness_history[-1]
     final_fitness = evaluate_population(population, mean_returns)
     best_index = np.argmax(final_fitness)
     best_weights = population[best_index]
     best_return = final_fitness[best_index]
-    return best_weights, best_return, mean_fitness
+
+    return best_weights, best_return, best_fitness, mean_fitness_final_gen
 
 if __name__ == "__main__":
     num_runs = 30
@@ -87,8 +90,8 @@ if __name__ == "__main__":
     for run in range(1, num_runs + 1):
         start_time = time.time()
 
-        best_weights, best_return, mean_fitness = evolution_strategies_mu_comma_lambda(
-            mean_returns.values,
+        best_weights, expected_return, best_fitness, mean_fitness = evolution_strategies_mu_comma_lambda(
+            mean_returns,
             covariance_matrix,
             num_assets,
             mu=mu,
@@ -104,20 +107,21 @@ if __name__ == "__main__":
 
         results.append([
             run,
+            best_fitness,
             mean_fitness,
-            best_return,
+            expected_return,
             portfolio_variance,
             best_weights.tolist(),   # Convert numpy array to list for CSV
             training_time
         ])
 
-        print(f"Run {run}/{num_runs} completed. Mean Fitness: {mean_fitness:.6f}")
+        print(f"Run {run}/{num_runs} completed. Best Fitness: {best_fitness:.6f}")
 
     csv_file_name = os.path.join(results_dir, 'es_mu_comma_lambda_results.csv')
     with open(csv_file_name, mode='w', newline='') as csv_file:
         writer = csv.writer(csv_file)
         writer.writerow([
-            'Run', 'Mean Fitness', 'Expected Return', 'Portfolio Variance',
+            'Run', 'Best Fitness', 'Mean Fitness', 'Expected Return', 'Portfolio Variance',
             'Weights', 'Training Time'
         ])
         for result in results:
