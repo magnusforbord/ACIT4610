@@ -207,6 +207,27 @@ plt.tight_layout()
 plt.savefig(os.path.join(figures_dir, 'training_time_boxplot.png'))
 plt.show()
 
+# --- Visualization 7: Histogram of Expected Returns ---
+
+plt.figure(figsize=(12, 6))
+sns.histplot(
+    data=combined_results,
+    x='Expected Return',
+    hue='Algorithm',
+    multiple='stack',
+    palette='husl',
+    bins=20,
+    edgecolor='black'
+)
+plt.title('Histogram of Expected Returns Across Runs')
+plt.xlabel('Expected Return')
+plt.ylabel('Frequency')
+plt.legend(title='Algorithm', bbox_to_anchor=(1.05, 1), loc='upper left')
+plt.tight_layout()
+plt.savefig(os.path.join(figures_dir, 'expected_returns_histogram.png'))
+plt.show()
+
+
 # --- Additional Statistical Test: Pairwise Comparisons ---
 
 # If ANOVA is significant, perform pairwise t-tests
