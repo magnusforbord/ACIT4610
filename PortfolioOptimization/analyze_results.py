@@ -189,7 +189,15 @@ else:
 # --- Visualization 5: Boxplot of Best Fitness per Algorithm ---
 
 plt.figure(figsize=(12, 6))
-sns.boxplot(data=combined_results, x='Algorithm', y='Best Fitness', palette='Set3')
+sns.boxplot(
+    data=combined_results,
+    x='Algorithm',
+    y='Best Fitness',
+    hue='Algorithm',
+    palette='Set3',
+    dodge=False
+)
+plt.legend([],[], frameon=False)
 plt.title('Distribution of Best Fitness per Algorithm')
 plt.xticks(rotation=45)
 plt.tight_layout()
@@ -199,7 +207,14 @@ plt.show()
 # --- Visualization 6: Training Time per Run per Algorithm ---
 
 plt.figure(figsize=(12, 6))
-sns.boxplot(data=combined_results, x='Algorithm', y='Training Time', palette='Set2')
+sns.boxplot(
+    data=combined_results,
+    x='Algorithm',
+    y='Training Time',
+    hue='Algorithm',
+    palette='Set2',
+    dodge=False
+)
 plt.title('Training Time per Run per Algorithm')
 plt.xticks(rotation=45)
 plt.ylabel('Training Time (seconds)')
