@@ -30,7 +30,7 @@ for algo_name, file_name in algorithms.items():
     file_path = os.path.join(results_dir, file_name)
     if os.path.exists(file_path):
         df = pd.read_csv(file_path)
-        df['Algorithm'] = algo_name  # Add a column for algorithm name
+        df['Algorithm'] = algo_name
         all_results[algo_name] = df
     else:
         print(f"File not found: {file_path}")
