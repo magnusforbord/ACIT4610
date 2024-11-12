@@ -95,8 +95,6 @@ class Particle:
             missing = set(range(1, len(self.problem.customers) + 1)) - assigned
             raise ValueError(f"Missing customers: {missing}")
         
-        print(f"Created solution with {len(self.position)} routes")
-        
         # Set initial personal best quietly
         self.personal_best_position = [route.copy() for route in self.position]
         self.personal_best_cost = self._calculate_total_cost()

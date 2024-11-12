@@ -28,6 +28,7 @@ class PSOOptimizer(BaseOptimizer):
         """Run PSO optimization."""
         best_solution = None
         best_cost = float('inf')
+        iterations_without_improvement = 0
         
         print("\nStarting PSO optimization...")
         start_time = time.time()
@@ -38,7 +39,10 @@ class PSOOptimizer(BaseOptimizer):
                 particle.personal_best_cost < best_cost):
                 best_solution = [route.copy() for route in particle.position]
                 best_cost = particle.personal_best_cost
-                print(f"Found initial solution: {best_cost:.2f}")
+                print(f"New best solution found!")
+                print(f"Cost: {best_cost:.2f}")
+                print(f"Number of routes: {len(best_solution)}")
+                print("-" * 40)
         
         # Run iterations
         for iteration in range(max_iterations):
@@ -62,13 +66,27 @@ class PSOOptimizer(BaseOptimizer):
                     self.swarm.global_best_position = [route.copy() for route in particle.position]
                     self.swarm.global_best_cost = particle.personal_best_cost
                     improved = True
+                    iterations_without_improvement = 0
+                    
+                    print(f"\nNew best solution found in iteration {iteration}!")
+                    print(f"Cost: {best_cost:.2f}")
+                    print(f"Number of routes: {len(best_solution)}")
+                    print("-" * 40)
+
+            if not improved:
+                iterations_without_improvement += 1
             
-            if improved:
-                print(f"Iteration {iteration}: New best solution = {best_cost:.2f}")
         
         end_time = time.time()
-        print(f"\nOptimization completed in {end_time - start_time:.2f} seconds")
-        print(f"Best solution found: {best_cost:.2f}")
+        time_taken = end_time - start_time
+
+        print("\nOptimization Summary:")
+        print("-" * 40)
+        print(f"Time taken: {time_taken:.2f} seconds")
+        print(f"Total iterations: {max_iterations}")
+        print(f"Final best cost: {best_cost:.2f}")
+        print(f"Number of routes: {len(best_solution) if best_solution else 0}")
+        print(f"Iterations without improvement: {iterations_without_improvement}")
         
         if best_solution is None:
             print("WARNING: No feasible solution found!")
