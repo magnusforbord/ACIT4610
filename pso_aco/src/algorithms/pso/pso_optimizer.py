@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 from src.algorithms.pso.swarm import Swarm
 from src.algorithms.base import BaseOptimizer, Solution
 import time
@@ -58,59 +58,51 @@ class PSOOptimizer(BaseOptimizer):
         return final_time <= self.problem.depot.due_time
 
     def _apply_local_search(self, routes: List[List[int]]) -> List[List[int]]:
-        """Apply local search focusing on shortest route"""
         if not routes:
             return routes
-
-        # Create copies to avoid modifying original routes
-        routes = [route.copy() for route in routes]
             
-        # Find shortest non-empty route
-        non_empty_routes = [(i, r) for i, r in enumerate(routes) if r]
-        if not non_empty_routes:
-            return routes
-            
-        shortest_route_idx, shortest_route = min(non_empty_routes, 
-                                               key=lambda x: len(x[1]))
+        improved = True
+        best_distance = self.calculate_total_distance(routes)
         
-        # Store original route for restoration if needed
-        original_routes = [route.copy() for route in routes]
-        customers_to_move = shortest_route.copy()
-        
-        for customer in customers_to_move:
-            inserted = False
+        while improved:
+            improved = False
             
-            # Try each route except the shortest one
+            # Intra-route optimization
             for i in range(len(routes)):
-                if i == shortest_route_idx:
-                    continue
-                    
-                target_route = routes[i]
+                # 2-opt improvement
+                routes[i] = self._apply_2opt(routes[i])
+                # Or-opt improvement (relocate sequence of 1-3 customers)
+                routes[i] = self._apply_or_opt(routes[i])
                 
-                # Try each position in the target route
-                for pos in range(len(target_route) + 1):
-                    # Create temporary route with customer inserted
-                    temp_route = target_route[:pos] + [customer] + target_route[pos:]
-                    
-                    # Check feasibility
-                    if self.is_route_feasible(temp_route):
-                        # Update route
-                        routes[i] = temp_route
-                        shortest_route.remove(customer)
-                        routes[shortest_route_idx] = shortest_route
-                        inserted = True
-                        break
-                
-                if inserted:
-                    break
-            
-            if not inserted:
-                # Restore original routes if we couldn't insert
-                return original_routes
+            # Inter-route optimization
+            for i in range(len(routes)):
+                for j in range(i + 1, len(routes)):
+                    # Cross-exchange
+                    new_route1, new_route2 = self._cross_exchange(routes[i], routes[j])
+                    if new_route1 and new_route2:
+                        temp_routes = routes.copy()
+                        temp_routes[i] = new_route1
+                        temp_routes[j] = new_route2
+                        new_distance = self.calculate_total_distance(temp_routes)
+                        if new_distance < best_distance:
+                            routes = temp_routes
+                            best_distance = new_distance
+                            improved = True
+                            
+                    # CROSS operator (swap route segments)
+                    new_route1, new_route2 = self._cross_operator(routes[i], routes[j])
+                    if new_route1 and new_route2:
+                        temp_routes = routes.copy()
+                        temp_routes[i] = new_route1
+                        temp_routes[j] = new_route2
+                        new_distance = self.calculate_total_distance(temp_routes)
+                        if new_distance < best_distance:
+                            routes = temp_routes
+                            best_distance = new_distance
+                            improved = True
         
-        # Remove empty routes
-        return [route for route in routes if route]
-
+        return routes
+    
     def _calculate_arrival_times(self, routes: List[List[int]]) -> List[List[float]]:
         """Calculate arrival times for all routes"""
         arrival_times = []
@@ -304,3 +296,128 @@ class PSOOptimizer(BaseOptimizer):
             distance += self.distance_matrix[route[i]][route[i + 1]]
         distance += self.distance_matrix[route[-1]][0]  # Last to depot
         return distance
+    
+    def _apply_2opt(self, route: List[int]) -> List[int]:
+        """2-opt local search for single route"""
+        if len(route) < 3:
+            return route
+            
+        improved = True
+        best_distance = self.calculate_route_distance(route)
+        
+        while improved:
+            improved = False
+            
+            for i in range(len(route) - 1):
+                for j in range(i + 2, len(route)):
+                    # Create new route with 2-opt swap
+                    new_route = route[:i+1] + route[j:i:-1] + route[j+1:]
+                    
+                    # Check feasibility and improvement
+                    if self.is_route_feasible(new_route):
+                        new_distance = self.calculate_route_distance(new_route)
+                        if new_distance < best_distance:
+                            route = new_route
+                            best_distance = new_distance
+                            improved = True
+                            break
+                if improved:
+                    break
+                    
+        return route
+
+    def _apply_or_opt(self, route: List[int]) -> List[int]:
+        """Or-opt local search (relocate sequence of 1-3 customers)"""
+        if len(route) < 2:
+            return route
+            
+        improved = True
+        best_distance = self.calculate_route_distance(route)
+        
+        while improved:
+            improved = False
+            
+            # Try different sequence lengths
+            for seq_length in range(1, min(4, len(route))):
+                # Try each possible sequence
+                for i in range(len(route) - seq_length + 1):
+                    sequence = route[i:i+seq_length]
+                    remaining = route[:i] + route[i+seq_length:]
+                    
+                    # Try inserting sequence at each position
+                    for j in range(len(remaining) + 1):
+                        new_route = remaining[:j] + sequence + remaining[j:]
+                        
+                        if self.is_route_feasible(new_route):
+                            new_distance = self.calculate_route_distance(new_route)
+                            if new_distance < best_distance:
+                                route = new_route
+                                best_distance = new_distance
+                                improved = True
+                                break
+                                
+                    if improved:
+                        break
+                if improved:
+                    break
+                    
+        return route
+
+    def _cross_exchange(self, route1: List[int], route2: List[int]) -> Tuple[List[int], List[int]]:
+        """Cross-exchange between two routes"""
+        if not route1 or not route2:
+            return route1, route2
+            
+        best_route1, best_route2 = None, None
+        best_total = self.calculate_route_distance(route1) + self.calculate_route_distance(route2)
+        
+        for i in range(len(route1)):
+            for j in range(len(route2)):
+                # Try swapping single customers
+                new_route1 = route1[:i] + [route2[j]] + route1[i+1:]
+                new_route2 = route2[:j] + [route1[i]] + route2[j+1:]
+                
+                if (self.is_route_feasible(new_route1) and 
+                    self.is_route_feasible(new_route2)):
+                    
+                    total = self.calculate_route_distance(new_route1) + \
+                            self.calculate_route_distance(new_route2)
+                            
+                    if total < best_total:
+                        best_route1, best_route2 = new_route1, new_route2
+                        best_total = total
+        
+        return best_route1 or route1, best_route2 or route2
+
+    def _cross_operator(self, route1: List[int], route2: List[int]) -> Tuple[List[int], List[int]]:
+        """CROSS operator (swap route segments)"""
+        if len(route1) < 2 or len(route2) < 2:
+            return route1, route2
+            
+        best_route1, best_route2 = None, None
+        best_total = self.calculate_route_distance(route1) + self.calculate_route_distance(route2)
+        
+        # Try different segment lengths
+        max_length = min(len(route1), len(route2), 3)  # Limit segment length to 3
+        
+        for length in range(1, max_length + 1):
+            for i in range(len(route1) - length + 1):
+                for j in range(len(route2) - length + 1):
+                    # Extract and swap segments
+                    seg1 = route1[i:i+length]
+                    seg2 = route2[j:j+length]
+                    
+                    new_route1 = route1[:i] + seg2 + route1[i+length:]
+                    new_route2 = route2[:j] + seg1 + route2[j+length:]
+                    
+                    if (self.is_route_feasible(new_route1) and 
+                        self.is_route_feasible(new_route2)):
+                        
+                        total = self.calculate_route_distance(new_route1) + \
+                                self.calculate_route_distance(new_route2)
+                                
+                        if total < best_total:
+                            best_route1, best_route2 = new_route1, new_route2
+                            best_total = total
+        
+        return best_route1 or route1, best_route2 or route2
