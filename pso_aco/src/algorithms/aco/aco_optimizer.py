@@ -54,7 +54,48 @@ class ACOOptimizer(BaseOptimizer):
             
         end_time = time.time()
         print(f"\nOptimization completed in {end_time - start_time:.2f} seconds")
-        
+        print("\nOptimal Solution:")
+        print(f"Total Distance: {best_distance:.2f}")
+        print(f"Number of Routes: {len(best_solution)}")
+
+        for i, route in enumerate(best_solution, start=1):
+            total_load = sum(self.problem.customers[customer-1].demand for customer in route)
+            print(f"Vehicle {i}: {' -> '.join(str(customer) for customer in route)}")
+            print(f"  Total Load: {total_load}/{self.problem.capacity}")
+            
+            # Check time constraints
+            current_time = 0
+            current_pos = 0  # Start at depot
+            time_feasible = True
+            
+            for customer_id in route:
+                customer = self.problem.customers[customer_id - 1]
+                
+                # Add travel time
+                travel_time = self.time_matrix[current_pos][customer_id]
+                arrival_time = current_time + travel_time
+                
+                # Check if we arrived too late
+                if arrival_time > customer.due_time:
+                    time_feasible = False
+                    print(f"  Time Constraint Violated: Arrived at customer {customer_id} at {arrival_time}, due time is {customer.due_time}")
+                    break
+                    
+                # Update current time (wait if arrived too early)
+                current_time = max(arrival_time, customer.ready_time) + customer.service_time
+                current_pos = customer_id
+                
+            # Check return to depot
+            final_travel_time = self.time_matrix[current_pos][0]
+            final_arrival = current_time + final_travel_time
+            
+            if final_arrival > self.problem.depot.due_time:
+                time_feasible = False
+                print(f"  Time Constraint Violated: Arrived at depot at {final_arrival}, due time is {self.problem.depot.due_time}")
+                
+            if time_feasible:
+                print("  Time Constraints Satisfied")
+    
         return Solution(
             routes=best_solution if best_solution else [],
             total_distance=best_distance if best_solution else float('inf'),
@@ -102,7 +143,7 @@ class ACOOptimizer(BaseOptimizer):
             
         # Check capacity constraint
         total_demand = sum(self.problem.customers[c-1].demand for c in route)
-        if total_demand > self.problem.capacity:
+        if total_demand > self.problem.capacity:  
             return False
             
         # Check time windows

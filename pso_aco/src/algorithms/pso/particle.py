@@ -1,5 +1,5 @@
+from typing import List, Tuple
 import numpy as np
-from typing import List, Tuple, Set
 from src.utils.data_loader import Problem
 
 class Particle:
@@ -7,211 +7,212 @@ class Particle:
         self.problem = problem
         self.distance_matrix = distance_matrix
         self.time_matrix = time_matrix
+        self.position = self._initialize_position()
+        self.velocity = np.random.uniform(-0.4, 0.4, size=len(problem.customers))
+        self.best_position = self.position.copy()
+        self.best_routes = []
+        self.best_fitness = float('inf')
         
-        self.position: List[List[int]] = []
-        self.velocity: List[float] = np.zeros(len(problem.customers))
-        self.personal_best_position: List[List[int]] = []
-        self.personal_best_cost = float('inf')
-        
-        self.initialize_position()
-
-    def initialize_position(self):
-        """Initialize solution ensuring all customers are assigned exactly once."""
-        unassigned = set(range(1, len(self.problem.customers) + 1))
-        self.position = []
-        vehicles_used = 0
-        
-        while unassigned and vehicles_used < self.problem.vehicles:
-            # Start new route
-            route = []
-            capacity = self.problem.capacity
-            current_time = 0
-            
-            # Try to build route
-            candidates = list(unassigned)
-            np.random.shuffle(candidates)
-            
-            for customer_id in candidates[:]:
-                customer = self.problem.customers[customer_id-1]
-                
-                # Check if customer can be added to route
-                if customer.demand <= capacity:
-                    # Check time feasibility
-                    if not route:  # First in route
-                        arrival_time = self.time_matrix[0][customer_id]
-                    else:
-                        arrival_time = current_time + self.time_matrix[route[-1]][customer_id]
-                    
-                    if arrival_time <= customer.due_time:
-                        service_start = max(arrival_time, customer.ready_time)
-                        service_end = service_start + customer.service_time
-                        return_time = service_end + self.time_matrix[customer_id][0]
-                        
-                        if return_time <= self.problem.depot.due_time:
-                            route.append(customer_id)
-                            unassigned.remove(customer_id)
-                            capacity -= customer.demand
-                            current_time = service_end
-            
-            if route:  # Only add non-empty routes
-                self.position.append(route)
-                vehicles_used += 1
-        
-        # If there are still unassigned customers, try to insert them into existing routes
-        if unassigned:
-            for customer_id in list(unassigned):
-                inserted = False
-                # Try each route
-                for route in self.position:
-                    # Check capacity
-                    route_demand = sum(self.problem.customers[c-1].demand for c in route)
-                    if route_demand + self.problem.customers[customer_id-1].demand <= self.problem.capacity:
-                        # Try each position
-                        for pos in range(len(route) + 1):
-                            new_route = route[:pos] + [customer_id] + route[pos:]
-                            if self._is_route_feasible(new_route):
-                                route[:] = new_route
-                                unassigned.remove(customer_id)
-                                inserted = True
-                                break
-                    if inserted:
-                        break
-                        
-                if not inserted and vehicles_used < self.problem.vehicles:
-                    # Create new route for this customer
-                    self.position.append([customer_id])
-                    unassigned.remove(customer_id)
-                    vehicles_used += 1
-        
-        # Verify solution
-        assigned = set()
-        for route in self.position:
-            for customer in route:
-                if customer in assigned:
-                    raise ValueError(f"Customer {customer} assigned multiple times")
-                assigned.add(customer)
-        
-        if len(assigned) != len(self.problem.customers):
-            missing = set(range(1, len(self.problem.customers) + 1)) - assigned
-            raise ValueError(f"Missing customers: {missing}")
-        
-        # Set initial personal best quietly
-        self.personal_best_position = [route.copy() for route in self.position]
-        self.personal_best_cost = self._calculate_total_cost()
-        
-        # Improve initial solution without logging
-        self._local_search()
-
-    def update_velocity(self, global_best_position: List[List[int]], w: float, c1: float, c2: float):
-        """Update particle's velocity."""
-        current_seq = [c for route in self.position for c in route]
-        personal_best_seq = [c for route in self.personal_best_position for c in route]
-        global_best_seq = [c for route in global_best_position for c in route]
-        
-        inertia = w * self.velocity
-        cognitive = c1 * np.random.random() * self._sequence_difference(personal_best_seq, current_seq)
-        social = c2 * np.random.random() * self._sequence_difference(global_best_seq, current_seq)
-        
-        self.velocity = inertia + cognitive + social
-
-    def update_position(self):
-        """Update particle's position based on velocity."""
-        if not self.position:
-            self.initialize_position()
-            return
-            
-        # Get customers to move
-        moves = np.where(np.random.random(len(self.velocity)) < np.abs(self.velocity))[0]
-        if not moves.size:
-            return
-            
-        # Create new solution
-        current_seq = [c for route in self.position for c in route]
-        for idx in moves:
-            customer = idx + 1
-            if customer in current_seq:
-                curr_pos = current_seq.index(customer)
-                new_pos = (curr_pos + np.random.randint(-2, 3)) % len(current_seq)
-                current_seq.pop(curr_pos)
-                current_seq.insert(new_pos, customer)
-        
-        # Convert back to routes
-        new_position = []
-        route = []
-        capacity = self.problem.capacity
+    def _initialize_position(self) -> np.ndarray:
+        """Initialize particle position using modified nearest neighbor heuristic"""
+        position = np.zeros(len(self.problem.customers))
+        unvisited = set(range(len(self.problem.customers)))
+        current = 0  # Start at depot
         current_time = 0
-        current_pos = 0
+        current_capacity = self.problem.capacity
         
-        for customer_id in current_seq:
-            customer = self.problem.customers[customer_id-1]
+        for i in range(len(self.problem.customers)):
+            if not unvisited:
+                break
+                
+            best_next = None
+            best_score = float('inf')
             
-            if (customer.demand <= capacity and 
-                self._is_route_feasible(route + [customer_id])):
-                route.append(customer_id)
-                capacity -= customer.demand
-                if len(route) == 1:
-                    travel_time = self.time_matrix[0][customer_id]
-                else:
-                    travel_time = self.time_matrix[route[-2]][customer_id]
-                current_time = max(current_time + travel_time, customer.ready_time) + customer.service_time
-                current_pos = customer_id
+            for next_cust in unvisited:
+                customer = self.problem.customers[next_cust]
+                travel_time = self.time_matrix[current][next_cust + 1]
+                arrival_time = current_time + travel_time
+                
+                if (arrival_time <= customer.due_time and 
+                    customer.demand <= current_capacity):
+                    
+                    # Score combines distance, time window urgency, and demand
+                    time_slack = customer.due_time - arrival_time
+                    demand_ratio = customer.demand / self.problem.capacity
+                    
+                    score = (
+                        self.distance_matrix[current][next_cust + 1] +
+                        0.3 * time_slack +
+                        0.2 * demand_ratio
+                    )
+                    
+                    if score < best_score:
+                        best_score = score
+                        best_next = next_cust
+            
+            if best_next is not None:
+                position[best_next] = 1.0 - (i / len(self.problem.customers))
+                unvisited.remove(best_next)
+                current = best_next + 1
+                current_time = max(
+                    current_time + self.time_matrix[current-1][current],
+                    self.problem.customers[best_next].ready_time
+                ) + self.problem.customers[best_next].service_time
+                current_capacity -= self.problem.customers[best_next].demand
             else:
-                if route:
-                    new_position.append(route)
-                if len(new_position) < self.problem.vehicles:
-                    route = [customer_id]
-                    capacity = self.problem.capacity - customer.demand
-                    current_time = max(self.time_matrix[0][customer_id], customer.ready_time) + customer.service_time
-                    current_pos = customer_id
-                else:
+                # Assign remaining customers randomly
+                remaining = list(unvisited)
+                random_priorities = np.random.uniform(0, 0.5, size=len(remaining))
+                for cust, pri in zip(remaining, random_priorities):
+                    position[cust] = pri
+                break
+        
+        # Add small random noise
+        position += np.random.uniform(-0.05, 0.05, size=len(position))
+        return np.clip(position, 0, 1)
+        
+    def _nearest_neighbor_init(self) -> np.ndarray:
+        position = np.zeros(len(self.problem.customers))
+        maxVal = float('inf')
+        unvisited = set(range(len(self.problem.customers)))
+        current = 0  # depot
+        current_time = 0
+        
+        # Initialize heuristic scores
+        heuristic = np.zeros(len(self.problem.customers))
+        
+        while unvisited:
+            for city in unvisited:
+                travel_time = self.time_matrix[current][city + 1]
+                arrival_time = current_time + travel_time
+                wait_time = max(self.problem.customers[city].ready_time - arrival_time, 0)
+                
+                # Combine multiple factors in scoring
+                heuristic[city] = (
+                    travel_time + 
+                    wait_time + 
+                    (self.problem.customers[city].due_time - arrival_time) * 0.3 +
+                    (self.problem.customers[city].demand / self.problem.capacity) * 50
+                )
+            
+            nearest = min((h, i) for i, h in enumerate(heuristic) 
+                        if i in unvisited)[1]
+            
+            # Assign position value based on order and urgency
+            due_time_factor = 1.0 - (self.problem.customers[nearest].due_time / 
+                                    max(c.due_time for c in self.problem.customers))
+            position[nearest] = 1.0 - (len(position) - len(unvisited)) / len(position)
+            position[nearest] *= (1 + 0.2 * due_time_factor)  # Adjust by due time
+            
+            unvisited.remove(nearest)
+            current = nearest + 1
+            current_time = max(
+                current_time + self.time_matrix[current-1][current],
+                self.problem.customers[nearest].ready_time
+            ) + self.problem.customers[nearest].service_time
+            heuristic[nearest] = maxVal
+            
+        return np.clip(position, 0, 1)
+
+    def _local_search(self, routes: List[List[int]]) -> List[List[int]]:
+        if not routes:
+            return routes
+            
+        improved = True
+        while improved:
+            improved = False
+            
+            # 1. Try moving single customers between routes
+            for i in range(len(routes)):
+                for j in range(len(routes)):
+                    if i == j:
+                        continue
+                        
+                    route1, route2 = routes[i], routes[j]
+                    
+                    # Try moving each customer
+                    for pos1 in range(len(route1)):
+                        customer = route1[pos1]
+                        
+                        # Try all possible positions in route2
+                        best_pos = None
+                        best_cost = float('inf')
+                        
+                        for pos2 in range(len(route2) + 1):
+                            new_route2 = route2[:pos2] + [customer] + route2[pos2:]
+                            new_route1 = route1[:pos1] + route1[pos1+1:]
+                            
+                            if (self._is_time_feasible(new_route1) and 
+                                self._is_time_feasible(new_route2)):
+                                
+                                old_cost = (self._calculate_route_cost(route1) + 
+                                        self._calculate_route_cost(route2))
+                                new_cost = (self._calculate_route_cost(new_route1) + 
+                                        self._calculate_route_cost(new_route2))
+                                
+                                if new_cost < best_cost:
+                                    best_cost = new_cost
+                                    best_pos = pos2
+                        
+                        if best_pos is not None:
+                            route2.insert(best_pos, customer)
+                            route1.pop(pos1)
+                            improved = True
+                            break
+                    
+                    if improved:
+                        break
+                if improved:
                     break
+            
+            if not improved:
+                # 2. Try swapping customers between routes
+                for i in range(len(routes)):
+                    for j in range(i + 1, len(routes)):
+                        route1, route2 = routes[i], routes[j]
+                        
+                        for pos1 in range(len(route1)):
+                            for pos2 in range(len(route2)):
+                                # Try swapping
+                                cust1, cust2 = route1[pos1], route2[pos2]
+                                new_route1 = route1[:pos1] + [cust2] + route1[pos1+1:]
+                                new_route2 = route2[:pos2] + [cust1] + route2[pos2+1:]
+                                
+                                if (self._is_time_feasible(new_route1) and 
+                                    self._is_time_feasible(new_route2)):
+                                    
+                                    old_cost = (self._calculate_route_cost(route1) + 
+                                            self._calculate_route_cost(route2))
+                                    new_cost = (self._calculate_route_cost(new_route1) + 
+                                            self._calculate_route_cost(new_route2))
+                                    
+                                    if new_cost < old_cost:
+                                        route1[pos1], route2[pos2] = route2[pos2], route1[pos1]
+                                        improved = True
+                                        break
+                        
+                            if improved:
+                                break
+                        if improved:
+                            break
         
-        if route and len(new_position) < self.problem.vehicles:
-            new_position.append(route)
-        
-        if (new_position and 
-            len(new_position) <= self.problem.vehicles and 
-            sum(len(r) for r in new_position) == len(self.problem.customers) and
-            all(self._is_route_feasible(r) for r in new_position)):
-            self.position = new_position
-            cost = self._calculate_total_cost()
-            if cost < self.personal_best_cost:
-                self.personal_best_position = [r.copy() for r in new_position]
-                self.personal_best_cost = cost
-
-    def _sequence_difference(self, seq1: List[int], seq2: List[int]) -> np.ndarray:
-        """Calculate difference between two sequences."""
-        diff = np.zeros(len(self.problem.customers))
-        for i, customer in enumerate(seq1):
-            if i >= len(seq2) or customer != seq2[i]:
-                diff[customer-1] = 1
-        return diff
-
+        return [r for r in routes if r]  # Remove empty routes
+    
     def _calculate_route_cost(self, route: List[int]) -> float:
-        """Calculate total distance of a single route."""
+        """Calculate total distance of route"""
         if not route:
             return 0
-        cost = self.distance_matrix[0][route[0]]  # Depot to first
-        for i in range(len(route) - 1):
-            cost += self.distance_matrix[route[i]][route[i + 1]]
-        cost += self.distance_matrix[route[-1]][0]  # Last back to depot
+        cost = self.distance_matrix[0][route[0]]
+        for i in range(len(route)-1):
+            cost += self.distance_matrix[route[i]][route[i+1]]
+        cost += self.distance_matrix[route[-1]][0]
         return cost
 
-    def _calculate_total_cost(self) -> float:
-        """Calculate total distance of all routes."""
-        return sum(self._calculate_route_cost(route) for route in self.position)
 
-    def _is_route_feasible(self, route: List[int]) -> bool:
-        """Check if route satisfies capacity and time window constraints."""
+    def _is_time_feasible(self, route: List[int]) -> bool:
         if not route:
             return True
             
-        # Check capacity
-        total_demand = sum(self.problem.customers[c-1].demand for c in route)
-        if total_demand > self.problem.capacity:
-            return False
-            
-        # Check time windows
         current_time = 0
         current_pos = 0
         
@@ -223,51 +224,190 @@ class Particle:
             if arrival_time > customer.due_time:
                 return False
                 
-            service_start = max(arrival_time, customer.ready_time)
-            current_time = service_start + customer.service_time
+            current_time = max(arrival_time, customer.ready_time) + customer.service_time
             current_pos = customer_id
             
         # Check return to depot
-        return_time = current_time + self.time_matrix[current_pos][0]
-        return return_time <= self.problem.depot.due_time
+        final_time = current_time + self.time_matrix[current_pos][0]
+        return final_time <= self.problem.depot.due_time
 
-    def _local_search(self):
-        """Apply local search improvements."""
-        improved = True
-        while improved:
-            improved = False
+    def _can_return_to_depot(self, current_pos: int, current_time: float) -> bool:
+        return (current_time + self.time_matrix[current_pos][0] <= self.problem.depot.due_time)
+
+    def _decode_position(self) -> List[List[int]]:
+        routes: List[List[int]] = []
+        available_vehicles = self.problem.vehicles
+        unassigned = set(range(1, len(self.problem.customers) + 1))
+        
+        # Create clusters based on position values and geography
+        customers = [(i+1, 
+                    self.position[i],
+                    self.problem.customers[i].x,
+                    self.problem.customers[i].y,
+                    self.problem.customers[i].due_time) 
+                    for i in range(len(self.position))]
+        
+        # Calculate distance from depot for each customer
+        depot_x, depot_y = self.problem.depot.x, self.problem.depot.y
+        for i in range(len(customers)):
+            dist_to_depot = np.sqrt((customers[i][2] - depot_x)**2 + 
+                                (customers[i][3] - depot_y)**2)
+            # Calculate angle from depot
+            angle = np.arctan2(customers[i][3] - depot_y, 
+                            customers[i][2] - depot_x)
+            customers[i] = (*customers[i], dist_to_depot, angle)
+        
+        # Sort by position value, angle, and distance
+        sorted_customers = sorted(customers, 
+                                key=lambda x: (-x[1],  # Position value
+                                            x[6],     # Angle from depot
+                                            x[5]))    # Distance from depot
+        sorted_customers = [x[0] for x in sorted_customers]
+        
+        while unassigned and available_vehicles > 0:
+            current_route: List[int] = []
+            current_capacity = self.problem.capacity
+            current_time = 0
+            current_pos = 0
             
-            # Try intra-route improvements
-            for route in self.position:
-                # 2-opt
-                for i in range(len(route)-1):
-                    for j in range(i+2, len(route)):
-                        new_route = route[:i+1] + route[i+1:j+1][::-1] + route[j+1:]
-                        if (self._is_route_feasible(new_route) and 
-                            self._calculate_route_cost(new_route) < self._calculate_route_cost(route)):
-                            route[:] = new_route
-                            improved = True
+            # Start with first unassigned customer
+            for start_customer in sorted_customers:
+                if start_customer in unassigned:
+                    current_route.append(start_customer)
+                    unassigned.remove(start_customer)
+                    customer = self.problem.customers[start_customer-1]
+                    current_capacity -= customer.demand
+                    travel_time = self.time_matrix[current_pos][start_customer]
+                    current_time = max(current_time + travel_time, 
+                                    customer.ready_time) + customer.service_time
+                    current_pos = start_customer
+                    break
             
-            # Try inter-route improvements
-            for i in range(len(self.position)):
-                for j in range(i+1, len(self.position)):
-                    route1, route2 = self.position[i], self.position[j]
+            # Add nearest feasible neighbors
+            while True:
+                best_next = None
+                best_score = float('inf')
+                
+                for customer_id in unassigned:
+                    customer = self.problem.customers[customer_id-1]
+                    travel_time = self.time_matrix[current_pos][customer_id]
+                    arrival_time = current_time + travel_time
                     
-                    # Try swapping customers
-                    for pos1 in range(len(route1)):
-                        for pos2 in range(len(route2)):
-                            # Swap customers
-                            new_route1 = route1[:pos1] + [route2[pos2]] + route1[pos1+1:]
-                            new_route2 = route2[:pos2] + [route1[pos1]] + route2[pos2+1:]
-                            
-                            if (self._is_route_feasible(new_route1) and 
-                                self._is_route_feasible(new_route2)):
-                                old_cost = (self._calculate_route_cost(route1) + 
-                                          self._calculate_route_cost(route2))
-                                new_cost = (self._calculate_route_cost(new_route1) + 
-                                          self._calculate_route_cost(new_route2))
-                                
-                                if new_cost < old_cost:
-                                    self.position[i] = new_route1
-                                    self.position[j] = new_route2
-                                    improved = True
+                    if (arrival_time <= customer.due_time and 
+                        customer.demand <= current_capacity):
+                        
+                        # Score combines distance, time window, and angle
+                        dist = self.distance_matrix[current_pos][customer_id]
+                        time_slack = customer.due_time - arrival_time
+                        
+                        # Calculate angle difference
+                        curr_x = self.problem.customers[current_pos-1].x
+                        curr_y = self.problem.customers[current_pos-1].y
+                        next_x = customer.x
+                        next_y = customer.y
+                        angle_diff = abs(np.arctan2(next_y - curr_y, 
+                                                next_x - curr_x) - 
+                                    np.arctan2(curr_y - depot_y, 
+                                                curr_x - depot_x))
+                        
+                        score = (dist + 
+                                0.3 * time_slack + 
+                                50 * angle_diff)  # Weight angle difference heavily
+                        
+                        if score < best_score:
+                            best_score = score
+                            best_next = customer_id
+                
+                if best_next is None:
+                    break
+                    
+                current_route.append(best_next)
+                unassigned.remove(best_next)
+                customer = self.problem.customers[best_next-1]
+                current_capacity -= customer.demand
+                travel_time = self.time_matrix[current_pos][best_next]
+                current_time = max(current_time + travel_time, 
+                                customer.ready_time) + customer.service_time
+                current_pos = best_next
+            
+            if current_route:
+                routes.append(current_route)
+                available_vehicles -= 1
+            else:
+                break
+                    
+        return routes
+
+    def update_velocity(self, w: float, c1: float, c2: float, global_best_position: np.ndarray):
+        r1, r2 = np.random.random(2)
+        
+        # Calculate distance to personal and global best
+        personal_distance = np.linalg.norm(self.best_position - self.position)
+        global_distance = np.linalg.norm(global_best_position - self.position)
+        
+        # Adapt cognitive and social factors
+        adapted_c1 = c1 + (2.5 - c1) * (personal_distance / (personal_distance + global_distance))
+        adapted_c2 = c2 + (2.5 - c2) * (global_distance / (personal_distance + global_distance))
+        
+        # Calculate components
+        inertia = w * self.velocity
+        cognitive = adapted_c1 * r1 * (self.best_position - self.position)
+        social = adapted_c2 * r2 * (global_best_position - self.position)
+        
+        # Add diversity factor based on best fitness
+        if self.best_fitness > 1e-5:  # If we have a valid solution
+            diversity = np.random.uniform(-0.1, 0.1, size=len(self.velocity))
+            self.velocity = inertia + cognitive + social + diversity * (1.0 - w)  # Scale with inertia
+        else:
+            self.velocity = inertia + cognitive + social
+            
+        # Dynamic velocity clamping
+        v_max = 0.5 * (1.0 - w)  # Decrease as inertia decreases
+        self.velocity = np.clip(self.velocity, -v_max, v_max)
+    def update_position(self):
+        # Chaotic position update
+        chaos_factor = 1 / (1 + np.exp(-self.velocity))  # Sigmoid function
+        self.position = self.position + chaos_factor * self.velocity
+        
+        # Apply quantum-inspired position adjustment
+        if np.random.random() < 0.1:  # 10% chance
+            delta = np.random.uniform(-0.2, 0.2, size=len(self.position))
+            mask = np.random.random(size=len(self.position)) < 0.3  # 30% of dimensions
+            self.position[mask] += delta[mask]
+        
+        self.position = np.clip(self.position, 0, 1)
+
+    def evaluate(self) -> float:
+        routes = self._decode_position()
+        if not routes:
+            return float('inf')
+            
+        if len(routes) > self.problem.vehicles:
+            return float('inf')
+            
+        # Calculate total distance
+        total_distance = 0
+        for route in routes:
+            prev = 0
+            for customer in route:
+                total_distance += self.distance_matrix[prev][customer]
+                prev = customer
+            total_distance += self.distance_matrix[prev][0]
+        
+        # Add penalties
+        penalty = 0
+        all_customers = set(range(1, len(self.problem.customers) + 1))
+        served_customers = set(customer for route in routes for customer in route)
+        unserved = len(all_customers - served_customers)
+        
+        if unserved > 0:
+            penalty += unserved * 1000
+            
+        fitness = total_distance + penalty
+        
+        if fitness < self.best_fitness:
+            self.best_fitness = fitness
+            self.best_position = self.position.copy()
+            self.best_routes = routes
+            
+        return fitness
