@@ -172,67 +172,78 @@ class PSOOptimizer(BaseOptimizer):
         start_time = time.time()
         print(f"Starting PSO optimization with {max_iterations} iterations...")
         
-        best_solution = None
-        best_distance = float('inf')
-        no_improvement = 0
+        # Run multiple attempts
+        n_attempts = 3
+        best_solutions = []
         
-        for iteration in range(max_iterations):
-            print(f"Starting iteration {iteration}")
+        for attempt in range(n_attempts):
+            print(f"\nAttempt {attempt + 1}/{n_attempts}")
             
-            # Update inertia weight
-            w = self.swarm.w - (self.swarm.w - 0.4) * iteration / max_iterations
-            self.swarm.w = max(0.4, w)
+            best_solution = None
+            best_distance = float('inf')
+            no_improvement = 0
             
-            try:
-                self.swarm.optimize(1)
+            # Reset swarm for new attempt
+            self.swarm = Swarm(
+                problem=self.problem,
+                n_particles=self.swarm.n_particles,
+                distance_matrix=self.distance_matrix,
+                time_matrix=self.time_matrix,
+                w=0.95,
+                c1=2.8,
+                c2=1.2
+            )
+            
+            for iteration in range(max_iterations):
+                # Update inertia weight
+                w = self.swarm.w - (self.swarm.w - 0.2) * (iteration / max_iterations) ** 0.8
+                self.swarm.w = max(0.2, w)
                 
-                current_distance = self.swarm.global_best_fitness
-                current_routes = self.swarm.global_best_routes
-                                
-                if current_routes and len(current_routes) <= self.problem.vehicles:
-                    if current_distance < best_distance:
-                        best_distance = current_distance
-                        best_solution = current_routes.copy()
-                        no_improvement = 0
-                        print(f"Iteration {iteration}: New best distance = {best_distance:.2f}, "
-                            f"Routes = {len(current_routes)}, "
-                            f"Vehicles used = {len(current_routes)}/{self.problem.vehicles}")
+                try:
+                    self.swarm.optimize(1)
+                    
+                    current_distance = self.swarm.global_best_fitness
+                    current_routes = self.swarm.global_best_routes
+                    
+                    if current_routes and len(current_routes) <= self.problem.vehicles:
+                        if current_distance < best_distance:
+                            best_distance = current_distance
+                            best_solution = current_routes.copy()
+                            no_improvement = 0
+                            print(f"Iteration {iteration}: Distance = {best_distance:.2f}, Routes = {len(current_routes)}")
+                    
+                    # More frequent local search with intensity based on progress
+                    if iteration % max(3, iteration//10) == 0 and best_solution:
+                        improved_routes = self._apply_local_search(best_solution)
+                        improved_distance = self.calculate_total_distance(improved_routes)
+                        if improved_distance < best_distance:
+                            best_distance = improved_distance
+                            best_solution = improved_routes
+                            print(f"Local search improved solution: {best_distance:.2f}")
                 
-                # Apply local search periodically
-                if iteration % 5 == 0 and best_solution:
-                    print("Applying local search...")
-                    improved_routes = self._apply_local_search(best_solution)
-                    improved_distance = self.calculate_total_distance(improved_routes)
-                    if improved_distance < best_distance:
-                        best_distance = improved_distance
-                        best_solution = improved_routes
-                        print(f"Local search improved solution: {best_distance:.2f}")
-                        
-                        # Update swarm's global best with local search improvement
-                        best_particle = min(self.swarm.particles, key=lambda p: p.best_fitness)
-                        best_particle.best_routes = improved_routes.copy()
-                        best_particle.best_fitness = improved_distance
-                        self.swarm.global_best_routes = improved_routes.copy()
-                        self.swarm.global_best_fitness = improved_distance
-
-            except Exception as e:
-                print(f"Error in iteration {iteration}: {str(e)}")
-                import traceback
-                traceback.print_exc()
-                continue
+                except Exception as e:
+                    print(f"Error in iteration {iteration}: {str(e)}")
+                    continue
+            
+            if best_solution:
+                best_solutions.append((best_distance, best_solution))
+        
+        # Select best solution from all attempts
+        if best_solutions:
+            best_distance, best_solution = min(best_solutions, key=lambda x: x[0])
+        else:
+            best_distance, best_solution = float('inf'), []
         
         end_time = time.time()
         print(f"\nOptimization completed in {end_time - start_time:.2f} seconds")
-        print(f"Final best distance: {best_distance:.2f}")
-        print(f"Number of routes: {len(best_solution) if best_solution else 0}")
-        print(f"Vehicles used: {len(best_solution) if best_solution else 0}/{self.problem.vehicles}")
-        #print("Routes:", [f"Vehicle {i+1}: {route}" for i, route in enumerate(current_routes)])
-        return Solution(
-            routes=best_solution if best_solution else [],
-            total_distance=best_distance if best_solution else float('inf'),
-            feasible=True if best_solution else False
-        )
+        print(f"Best distance across attempts: {best_distance:.2f}")
+        print(f"Routes: {len(best_solution) if best_solution else 0}/{self.problem.vehicles}")
         
+        return Solution(
+            routes=best_solution,
+            total_distance=best_distance,
+            feasible=bool(best_solution)
+        )
 
     def calculate_total_distance(self, routes: List[List[int]]) -> float:
         """Calculate total distance for all routes"""
