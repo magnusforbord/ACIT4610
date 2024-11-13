@@ -7,12 +7,15 @@ class Particle:
         self.problem = problem
         self.distance_matrix = distance_matrix
         self.time_matrix = time_matrix
-        self.position = self._initialize_position()
-        self.velocity = np.random.uniform(-0.4, 0.4, size=len(problem.customers))
+        self.n_customers = len(problem.customers)
+        
+        # Initialize position as permutation of customer indices
+        self.position = np.arange(self.n_customers, dtype=int)
+        np.random.shuffle(self.position)
         self.best_position = self.position.copy()
         self.best_routes = []
         self.best_fitness = float('inf')
-        self.fitness = float('inf')  # Add this line
+
         
     def _initialize_position(self) -> np.ndarray:
         """Initialize particle position using modified nearest neighbor heuristic"""
@@ -235,149 +238,154 @@ class Particle:
     def _can_return_to_depot(self, current_pos: int, current_time: float) -> bool:
         return (current_time + self.time_matrix[current_pos][0] <= self.problem.depot.due_time)
 
+
+
     def _decode_position(self):
-        """Decode particle position into routes with time window clustering"""
-        n_customers = len(self.problem.customers)
         routes = []
+        unassigned = list(range(1, self.n_customers + 1))
         
-        # Group customers by time window similarity
-        customers = [(i+1, 
-                    self.position[i], 
-                    self.problem.customers[i].ready_time,
-                    self.problem.customers[i].due_time,
-                    self.problem.customers[i].demand) for i in range(n_customers)]
-        
-        # Sort by position value and time windows
-        customers.sort(key=lambda x: (x[1], x[2]))  # Sort by position value and ready time
-        
-        current_route = []
-        current_load = 0
-        current_time = 0
-        current_pos = 0
-        
-        while customers and len(routes) < self.problem.vehicles:
-            found = False
-            best_insertion = None
-            best_cost = float('inf')
+        while unassigned:
+            route = []
+            current_pos = 0  # depot
+            current_time = 0
+            capacity_left = self.problem.capacity
             
-            # Try each remaining customer
-            for i, (cust_id, _, ready_time, due_time, demand) in enumerate(customers):
-                if current_load + demand > self.problem.capacity:
+            # Find good initial customer for route
+            best_start = None
+            best_score = float('inf')
+            
+            for cust_id in unassigned:
+                customer = self.problem.customers[cust_id-1]
+                if customer.demand > capacity_left:
                     continue
                     
-                # Calculate insertion cost
-                travel_time = self.time_matrix[current_pos][cust_id]
-                arrival_time = current_time + travel_time
-                wait_time = max(0, ready_time - arrival_time)
+                # Score based on distance and time window urgency
+                travel_time = self.time_matrix[0][cust_id]
+                score = (
+                    travel_time * 2 +  # Distance from depot
+                    customer.due_time/100 -  # Later due times preferred
+                    self.position[cust_id-1] * 1000  # Priority from PSO
+                )
                 
-                if arrival_time + wait_time <= due_time:
-                    # Score based on distance and time window compatibility
-                    cost = (travel_time + wait_time + 
-                        0.5 * abs(current_time - ready_time))
-                    
-                    if cost < best_cost:
-                        best_cost = cost
-                        best_insertion = (i, cust_id, ready_time, due_time, demand)
-                        found = True
+                if score < best_score:
+                    best_score = score
+                    best_start = cust_id
             
-            if found:
-                idx, cust_id, ready_time, due_time, demand = best_insertion
-                current_route.append(cust_id)
-                current_load += demand
+            if best_start:
+                route.append(best_start)
+                unassigned.remove(best_start)
+                customer = self.problem.customers[best_start-1]
+                current_pos = best_start
+                travel_time = self.time_matrix[0][best_start]
+                current_time = max(travel_time, customer.ready_time) + customer.service_time
+                capacity_left -= customer.demand
                 
-                travel_time = self.time_matrix[current_pos][cust_id]
-                current_time = max(current_time + travel_time, ready_time) + \
-                            self.problem.customers[cust_id-1].service_time
-                current_pos = cust_id
-                
-                customers.pop(idx)
-            else:
-                # Start new route if current one is not empty
-                if current_route:
-                    routes.append(current_route)
-                    current_route = []
-                    current_load = 0
-                    current_time = 0
-                    current_pos = 0
-                else:
-                    # If we can't start a new route, break
-                    break
-        
-        # Add last route if not empty
-        if current_route:
-            routes.append(current_route)
-        
-        # Try to insert remaining customers into existing routes
-        if customers:
-            for cust_id, _, _, _, _ in customers:
-                self._insert_into_best_route(cust_id, routes)
-        
+                # Build rest of route
+                while unassigned:
+                    best_next = None
+                    best_score = float('inf')
+                    
+                    for cust_id in unassigned:
+                        customer = self.problem.customers[cust_id-1]
+                        if customer.demand > capacity_left:
+                            continue
+                            
+                        travel_time = self.time_matrix[current_pos][cust_id]
+                        arrival_time = current_time + travel_time
+                        
+                        if arrival_time > customer.due_time:
+                            continue
+                            
+                        # Score includes return to depot feasibility
+                        service_end = max(arrival_time, customer.ready_time) + customer.service_time
+                        to_depot = service_end + self.time_matrix[cust_id][0]
+                        
+                        if to_depot > self.problem.depot.due_time:
+                            continue
+                            
+                        score = (
+                            travel_time +  # Distance to next
+                            self.time_matrix[cust_id][0] * 0.5 +  # Distance to depot
+                            (arrival_time - current_time) * 0.3 +  # Delay factor
+                            (customer.due_time - arrival_time) * 0.1 -  # Time window slack
+                            self.position[cust_id-1] * 500  # Priority from PSO
+                        )
+                        
+                        if score < best_score:
+                            best_score = score
+                            best_next = cust_id
+                    
+                    if best_next:
+                        route.append(best_next)
+                        unassigned.remove(best_next)
+                        customer = self.problem.customers[best_next-1]
+                        current_pos = best_next
+                        travel_time = self.time_matrix[current_pos][best_next]
+                        current_time = max(current_time + travel_time, customer.ready_time) + customer.service_time
+                        capacity_left -= customer.demand
+                    else:
+                        break
+                        
+                routes.append(route)
+                    
         return routes
-    
+
     def update_velocity(self, w: float, c1: float, c2: float, global_best_position: np.ndarray):
         r1, r2 = np.random.random(2)
         
-        # Constriction coefficient
-        phi = c1 + c2
-        chi = 2.0 / (abs(2.0 - phi - np.sqrt(phi * phi - 4.0 * phi)))
+        # Increase exploitation as iterations progress
+        local_c1 = c1 * (1 + w)  # Increase cognitive component
+        local_c2 = c2 * (2 - w)  # Increase social component later
         
-        # Calculate velocity components with constriction
-        inertia = chi * w * self.velocity
-        cognitive = chi * c1 * r1 * (self.best_position - self.position)
-        social = chi * c2 * r2 * (global_best_position - self.position)
+        cognitive = local_c1 * r1 * (self.best_position - self.position)
+        social = local_c2 * r2 * (global_best_position - self.position)
         
-        # Add perturbation to escape local optima
-        if np.random.random() < 0.1:  # 10% chance
-            perturbation = np.random.normal(0, 0.1, size=len(self.velocity))
-            self.velocity = inertia + cognitive + social + perturbation
-        else:
-            self.velocity = inertia + cognitive + social
-            
-        # Dynamic velocity clamping
-        v_max = 0.5 * (1.0 - w)
-        self.velocity = np.clip(self.velocity, -v_max, v_max)
+        # Reduced random component for better convergence
+        random_component = np.random.normal(0, 0.05, size=len(self.position))
+        
+        velocity = w * random_component + cognitive + social
+        self.position = np.clip(self.position + velocity, 0, 1)
 
     def update_position(self):
-        # Simple position update
-        self.position = self.position + self.velocity
-        self.position = np.clip(self.position, 0, 1)
+        """Basic PSO position update"""
+        pass
 
     def evaluate(self) -> float:
         routes = self._decode_position()
         if not routes:
             return float('inf')
             
-        if len(routes) > self.problem.vehicles:
-            return float('inf')
-            
         # Calculate total distance
         total_distance = 0
+        served_customers = set()
+        
         for route in routes:
-            if not route:  # Skip empty routes
+            if not route:
                 continue
-            prev = 0
-            for customer in route:
-                total_distance += self.distance_matrix[prev][customer]
-                prev = customer
-            total_distance += self.distance_matrix[prev][0]
-        
-        # Add penalties
-        penalty = 0
-        all_customers = set(range(1, len(self.problem.customers) + 1))
-        served_customers = set(customer for route in routes for customer in route)
-        unserved = len(all_customers - served_customers)
-        
-        if unserved > 0:
-            penalty += unserved * 1000
+                
+            # Add distance from depot to first customer
+            total_distance += self.distance_matrix[0][route[0]]
             
-        self.fitness = total_distance + penalty  # Store current fitness
+            # Add distances between consecutive customers
+            for i in range(len(route) - 1):
+                total_distance += self.distance_matrix[route[i]][route[i + 1]]
+                served_customers.add(route[i])
+                
+            # Add distance back to depot and last customer
+            total_distance += self.distance_matrix[route[-1]][0]
+            served_customers.add(route[-1])
         
-        if self.fitness < self.best_fitness:
-            self.best_fitness = self.fitness
+        # Penalty for unserved customers
+        unserved = self.n_customers - len(served_customers)
+        if unserved > 0:
+            total_distance += unserved * 1000
+        
+        if total_distance < self.best_fitness:
+            self.best_fitness = total_distance
             self.best_position = self.position.copy()
             self.best_routes = routes
-            
-        return self.fitness
+        
+        return total_distance
     
     def _can_serve_customer(self, customer_id: int, current_route: list, current_time: float) -> bool:
         """Check if a customer can be served given current route and time"""
@@ -445,3 +453,53 @@ class Particle:
             routes[best_route_idx].insert(best_pos, customer_id)
             return True
         return False
+    
+    def _validate_route(self, route: List[int]) -> bool:
+        """Thoroughly validate a route against all constraints"""
+        if not route:
+            return True
+            
+        current_time = 0
+        current_pos = 0
+        total_load = 0
+        
+        # Check all customers in sequence
+        for cust_id in route:
+            customer = self.problem.customers[cust_id-1]
+            
+            # Check capacity
+            total_load += customer.demand
+            if total_load > self.problem.capacity:
+                return False
+                
+            # Check time windows
+            travel_time = self.time_matrix[current_pos][cust_id]
+            arrival_time = current_time + travel_time
+            
+            # Can't arrive after due time
+            if arrival_time > customer.due_time:
+                return False
+                
+            service_start = max(arrival_time, customer.ready_time)
+            current_time = service_start + customer.service_time
+            current_pos = cust_id
+        
+        # Check return to depot
+        return_time = current_time + self.time_matrix[current_pos][0]
+        return return_time <= self.problem.depot.due_time
+    
+    def _get_swap_sequence(self, current: np.ndarray, target: np.ndarray) -> List[Tuple[int, int]]:
+        """Get sequence of swaps to transform current into target"""
+        current_order = np.argsort(current)
+        target_order = np.argsort(target)
+        swaps = []
+        
+        current_working = current_order.copy()
+        
+        for i in range(len(current_order)):
+            if current_working[i] != target_order[i]:
+                j = np.where(current_working == target_order[i])[0][0]
+                current_working[i], current_working[j] = current_working[j], current_working[i]
+                swaps.append((i, j))
+                
+        return swaps

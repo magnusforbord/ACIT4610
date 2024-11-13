@@ -2,6 +2,7 @@ from typing import List, Tuple
 from src.algorithms.pso.swarm import Swarm
 from src.algorithms.base import BaseOptimizer, Solution
 import time
+import numpy as np
 
 class PSOOptimizer(BaseOptimizer):
     def __init__(self,
@@ -61,48 +62,17 @@ class PSOOptimizer(BaseOptimizer):
         if not routes:
             return routes
             
-        improved = True
-        best_distance = self.calculate_total_distance(routes)
+        # Only apply to a subset of routes each time
+        n_routes_to_improve = min(5, len(routes))
+        routes_to_improve = np.random.choice(len(routes), n_routes_to_improve, replace=False)
         
-        while improved:
-            improved = False
-            
-            # Intra-route optimization
-            for i in range(len(routes)):
-                # 2-opt improvement
-                routes[i] = self._apply_2opt(routes[i])
-                # Or-opt improvement (relocate sequence of 1-3 customers)
-                routes[i] = self._apply_or_opt(routes[i])
-                
-            # Inter-route optimization
-            for i in range(len(routes)):
-                for j in range(i + 1, len(routes)):
-                    # Cross-exchange
-                    new_route1, new_route2 = self._cross_exchange(routes[i], routes[j])
-                    if new_route1 and new_route2:
-                        temp_routes = routes.copy()
-                        temp_routes[i] = new_route1
-                        temp_routes[j] = new_route2
-                        new_distance = self.calculate_total_distance(temp_routes)
-                        if new_distance < best_distance:
-                            routes = temp_routes
-                            best_distance = new_distance
-                            improved = True
-                            
-                    # CROSS operator (swap route segments)
-                    new_route1, new_route2 = self._cross_operator(routes[i], routes[j])
-                    if new_route1 and new_route2:
-                        temp_routes = routes.copy()
-                        temp_routes[i] = new_route1
-                        temp_routes[j] = new_route2
-                        new_distance = self.calculate_total_distance(temp_routes)
-                        if new_distance < best_distance:
-                            routes = temp_routes
-                            best_distance = new_distance
-                            improved = True
+        for route_idx in routes_to_improve:
+            # 2-opt improvement
+            routes[route_idx] = self._apply_2opt(routes[route_idx])
+            # Or-opt improvement 
+            routes[route_idx] = self._apply_or_opt(routes[route_idx])
         
         return routes
-    
     def _calculate_arrival_times(self, routes: List[List[int]]) -> List[List[float]]:
         """Calculate arrival times for all routes"""
         arrival_times = []

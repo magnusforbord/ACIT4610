@@ -1,16 +1,20 @@
+import time
 import numpy as np
 from src.algorithms.pso.particle import Particle
 from src.utils.data_loader import Problem
 
 class Swarm:
-    def __init__(self,
-                 problem: Problem,
-                 n_particles: int,
-                 distance_matrix: np.ndarray,
-                 time_matrix: np.ndarray,
-                 w: float = 0.9,  
-                 c1: float = 2.05,  
-                 c2: float = 2.05): 
+    def __init__(self, 
+             problem: Problem,
+             n_particles: int,
+             distance_matrix: np.ndarray,
+             time_matrix: np.ndarray,
+             w: float = 0.9,
+             c1: float = 2.0,
+             c2: float = 2.0):
+    # Set random seed based on time
+        np.random.seed(int(time.time() * 1000) % 2**32)
+        
         self.problem = problem
         self.distance_matrix = distance_matrix
         self.time_matrix = time_matrix
@@ -23,43 +27,49 @@ class Swarm:
         
         self.particles = []
         
-        # Multi-strategy initialization
-        n_nearest = int(n_particles * 0.4)  # 40% nearest neighbor
-        n_savings = int(n_particles * 0.3)  # 30% savings
-        n_random = n_particles - n_nearest - n_savings  # 30% random
+        # Multi-strategy initialization with randomization
+        n_nearest = int(n_particles * 0.4)
+        n_savings = int(n_particles * 0.3)
+        n_random = n_particles - n_nearest - n_savings
         
-        # Nearest neighbor initialization
         for _ in range(n_nearest):
             p = Particle(problem, distance_matrix, time_matrix)
-            p.position = self._nearest_neighbor_init()
+            # Add random noise to nearest neighbor initialization
+            pos = self._nearest_neighbor_init()
+            noise = np.random.normal(0, 0.1, size=len(pos))
+            p.position = np.clip(pos + noise, 0, 1)
             self.particles.append(p)
             
-        # Savings-based initialization
         for _ in range(n_savings):
             p = Particle(problem, distance_matrix, time_matrix)
-            p.position = self._savings_based_init()
+            # Add random noise to savings initialization
+            pos = self._savings_based_init()
+            noise = np.random.normal(0, 0.1, size=len(pos))
+            p.position = np.clip(pos + noise, 0, 1)
             self.particles.append(p)
             
-        # Random initialization
         for _ in range(n_random):
             p = Particle(problem, distance_matrix, time_matrix)
+            # Truly random initialization
+            p.position = np.random.random(size=len(problem.customers))
             self.particles.append(p)
 
         self.global_best_position = None
         self.global_best_fitness = float('inf')
         self.global_best_routes = None
 
+
     def _nearest_neighbor_init(self) -> np.ndarray:
-        """Initialize using nearest neighbor with time windows"""
+        """Initialize using nearest neighbor with randomization"""
         n_customers = len(self.problem.customers)
         position = np.zeros(n_customers)
         unvisited = set(range(n_customers))
-        current = 0  # Start at depot
+        current = 0
         current_time = 0
         
         while unvisited:
-            best_next = None
-            best_value = float('inf')
+            feasible_next = []
+            feasible_scores = []
             
             for next_cust in unvisited:
                 cust = self.problem.customers[next_cust]
@@ -67,23 +77,29 @@ class Swarm:
                 arrival_time = current_time + travel_time
                 
                 if arrival_time <= cust.due_time:
-                    # Score combines distance and time window urgency
                     score = (travel_time + 
                             0.5 * (cust.due_time - arrival_time) +
-                            0.3 * cust.demand)
-                    if score < best_value:
-                        best_value = score
-                        best_next = next_cust
+                            0.3 * cust.demand +
+                            np.random.normal(0, 20))  # Add random noise to score
+                    feasible_next.append(next_cust)
+                    feasible_scores.append(score)
             
-            if best_next is not None:
-                position[best_next] = 1.0 - (len(position) - len(unvisited)) / len(position)
-                unvisited.remove(best_next)
-                current = best_next + 1
+            if feasible_next:
+                # Sometimes pick random feasible customer instead of best
+                if np.random.random() < 0.2:  # 20% chance
+                    next_cust = np.random.choice(feasible_next)
+                else:
+                    next_cust = feasible_next[np.argmin(feasible_scores)]
+                    
+                position[next_cust] = 1.0 - (len(position) - len(unvisited)) / len(position)
+                position[next_cust] *= (1 + np.random.normal(0, 0.1))  # Add noise to position value
+                unvisited.remove(next_cust)
+                current = next_cust + 1
                 current_time = max(current_time + self.time_matrix[current-1][current],
-                                 self.problem.customers[best_next].ready_time) + \
-                             self.problem.customers[best_next].service_time
+                                self.problem.customers[next_cust].ready_time) + \
+                            self.problem.customers[next_cust].service_time
             else:
-                # Assign remaining randomly
+                # Randomly assign remaining
                 for cust in unvisited:
                     position[cust] = np.random.random()
                 break
@@ -135,39 +151,61 @@ class Swarm:
                 position[i] = np.random.random()
         
         return np.clip(position, 0, 1)
-    def optimize(self, iterations: int = 1):
-        diversity_threshold = 0.1
         
+    def optimize(self, iterations: int = 1):
+        diversity_threshold = 0.15
+        n_stagnant = 0
+        max_stagnant = 15  # Increased patience
+        last_best = float('inf')
+        
+        # More aggressive parameter adaptation
+        w_start, w_end = 0.95, 0.2
+        c1_start, c1_end = 2.8, 1.2
+        c2_start, c2_end = 1.2, 2.8
+
         for it in range(iterations):
-            # Calculate swarm diversity
+            # Non-linear parameter adaptation
+            progress = (it / iterations) ** 0.8  # Non-linear decay
+            w = w_start - (w_start - w_end) * progress
+            c1 = c1_start - (c1_start - c1_end) * progress
+            c2 = c2_start + (c2_end - c2_start) * progress
+            
             positions = np.array([p.position for p in self.particles])
             diversity = np.mean(np.std(positions, axis=0))
             
-            # Reinitialize worst particles if diversity is too low
+            # Enhanced diversity management
             if diversity < diversity_threshold:
-                self._reinitialize_worst_particles()
-
-        for it in range(iterations):
-            # Update each particle
-            for particle in self.particles:
-                # Evaluate current position
-                fitness = particle.evaluate()
+                if n_stagnant > max_stagnant:
+                    # Partial reset with memory retention
+                    n_reset = len(self.particles) // 3  # Reset 33% of particles
+                    sorted_particles = sorted(self.particles, key=lambda p: p.best_fitness)
+                    for particle in sorted_particles[-n_reset:]:
+                        # Mix random with best known positions
+                        if np.random.random() < 0.7:
+                            particle.position = np.random.random(size=len(particle.position))
+                        else:
+                            # Perturb global best
+                            particle.position = self.global_best_position + np.random.normal(0, 0.3, size=len(particle.position))
+                            particle.position = np.clip(particle.position, 0, 1)
+                    n_stagnant = 0
                 
-                # Update global best if needed
+                # Increase exploration for remaining particles
+                w *= 1.2  # Boost inertia weight
+                
+            for particle in self.particles:
+                fitness = particle.evaluate()
                 if fitness < self.global_best_fitness:
-                    print(f"New global best found: {fitness}")
                     self.global_best_fitness = fitness
                     self.global_best_position = particle.position.copy()
                     self.global_best_routes = particle.best_routes.copy()
-                    
-                # Update particle velocity and position
-                if self.global_best_position is not None:
-                    w = self.w - (self.w - 0.4) * it / iterations
-                    particle.update_velocity(w, self.c1, self.c2, self.global_best_position)
-                    particle.update_position()
-
-        return self.global_best_fitness, self.global_best_routes
-    
+                    n_stagnant = 0
+                
+                particle.update_velocity(w, c1, c2, self.global_best_position)
+            
+            if abs(self.global_best_fitness - last_best) < 0.001:
+                n_stagnant += 1
+            last_best = self.global_best_fitness
+                
     def _reinitialize_worst_particles(self):
         """Reinitialize worst performing particles"""
         n_reinit = max(3, len(self.particles) // 10)  # Reinit 10% of particles
@@ -179,3 +217,4 @@ class Swarm:
             else:
                 particle.position = self._savings_based_init()
             particle.velocity = np.random.uniform(-0.4, 0.4, size=len(particle.position))
+
