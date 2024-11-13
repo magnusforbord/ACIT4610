@@ -1,6 +1,7 @@
 from typing import List, Tuple
 from src.algorithms.pso.swarm import Swarm
 from src.algorithms.base import BaseOptimizer, Solution
+from ...utils.pso_visualizer import PSOVisualizer
 import time
 import numpy as np
 
@@ -169,11 +170,14 @@ class PSOOptimizer(BaseOptimizer):
     
 
     def optimize(self, max_iterations: int) -> Solution:
+        # Initialize visualizer
+        visualizer = PSOVisualizer(self.problem, self.distance_matrix)
+        
         start_time = time.time()
         print(f"Starting PSO optimization with {max_iterations} iterations...")
         
         # Run multiple attempts
-        n_attempts = 3
+        n_attempts = 1
         best_solutions = []
         
         for attempt in range(n_attempts):
@@ -201,6 +205,14 @@ class PSOOptimizer(BaseOptimizer):
                 
                 try:
                     self.swarm.optimize(1)
+
+                    # Record state for visualization after each iteration
+                    visualizer.record_state(
+                        self.swarm.particles,
+                        self.swarm.global_best_position,
+                        self.swarm.global_best_fitness,
+                        self.swarm.global_best_routes if self.swarm.global_best_routes else []
+                    )
                     
                     current_distance = self.swarm.global_best_fitness
                     current_routes = self.swarm.global_best_routes
@@ -239,6 +251,9 @@ class PSOOptimizer(BaseOptimizer):
         print(f"Best distance across attempts: {best_distance:.2f}")
         print(f"Routes: {len(best_solution) if best_solution else 0}/{self.problem.vehicles}")
         
+        visualizer.plot_convergence('results/pso_convergence.png')
+        visualizer.create_route_animation('results/pso_route_evolution.gif')
+
         return Solution(
             routes=best_solution,
             total_distance=best_distance,

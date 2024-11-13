@@ -14,11 +14,6 @@ def main():
     dist_matrix = create_distance_matrix(problem.customers, problem.depot)
     time_matrix = create_time_matrix(problem, dist_matrix)
     
-    # Track metrics
-    iteration_distances = []
-    iteration_vehicles = []
-    local_search_improvements = []
-    
     # Initialize and run PSO
     pso = PSOOptimizer(
         problem=problem,
@@ -30,7 +25,7 @@ def main():
         c2=1.5    # Decrease social component initially
     )
     
-    solution = pso.optimize(max_iterations=200)
+    solution = pso.optimize(max_iterations=50)
     
     # Plot solution routes
     plt.figure(figsize=(15, 5))
@@ -58,19 +53,7 @@ def main():
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.grid(True)
 
-    # Plot convergence
-    plt.subplot(122)
-    plt.plot(iteration_distances, label='Total Distance', color='blue')
-    plt.plot(local_search_improvements, 'r*', label='Local Search Improvement')
-    plt.xlabel('Iteration')
-    plt.ylabel('Total Distance')
-    plt.title('Convergence History')
-    plt.legend()
-    plt.grid(True)
-    
-    plt.tight_layout()
-    plt.show()
-    
+
     # Print final statistics
     print("\nFinal Statistics:")
     print(f"Total Distance: {solution.total_distance:.2f}")

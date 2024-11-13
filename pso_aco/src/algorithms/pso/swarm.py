@@ -5,53 +5,62 @@ from src.utils.data_loader import Problem
 
 class Swarm:
     def __init__(self, 
-             problem: Problem,
-             n_particles: int,
-             distance_matrix: np.ndarray,
-             time_matrix: np.ndarray,
-             w: float = 0.9,
-             c1: float = 2.0,
-             c2: float = 2.0):
-    # Set random seed based on time
+            problem: Problem,
+            n_particles: int,
+            distance_matrix: np.ndarray,
+            time_matrix: np.ndarray,
+            w: float = 0.9,
+            c1: float = 2.0,
+            c2: float = 2.0):
         np.random.seed(int(time.time() * 1000) % 2**32)
         
         self.problem = problem
         self.distance_matrix = distance_matrix
         self.time_matrix = time_matrix
         self.n_particles = n_particles
-        
-        # Save PSO parameters
         self.w = w
         self.c1 = c1
         self.c2 = c2
         
         self.particles = []
         
-        # Multi-strategy initialization with randomization
-        n_nearest = int(n_particles * 0.4)
+        # Structured initialization
+        n_nearest = int(n_particles * 0.5)  # Increased nearest neighbor portion
         n_savings = int(n_particles * 0.3)
         n_random = n_particles - n_nearest - n_savings
         
-        for _ in range(n_nearest):
+        # Create base positions using each strategy
+        base_nearest = self._nearest_neighbor_init()
+        base_savings = self._savings_based_init()
+        
+        # Initialize nearest neighbor based particles with controlled perturbation
+        for i in range(n_nearest):
             p = Particle(problem, distance_matrix, time_matrix)
-            # Add random noise to nearest neighbor initialization
-            pos = self._nearest_neighbor_init()
-            noise = np.random.normal(0, 0.1, size=len(pos))
-            p.position = np.clip(pos + noise, 0, 1)
+            perturbation = np.random.normal(0, 0.05 + (i/n_nearest)*0.1, size=len(base_nearest))
+            p.position = np.clip(base_nearest + perturbation, 0, 1)
             self.particles.append(p)
-            
-        for _ in range(n_savings):
+        
+        # Initialize savings based particles with controlled perturbation
+        for i in range(n_savings):
             p = Particle(problem, distance_matrix, time_matrix)
-            # Add random noise to savings initialization
-            pos = self._savings_based_init()
-            noise = np.random.normal(0, 0.1, size=len(pos))
-            p.position = np.clip(pos + noise, 0, 1)
+            perturbation = np.random.normal(0, 0.05 + (i/n_savings)*0.1, size=len(base_savings))
+            p.position = np.clip(base_savings + perturbation, 0, 1)
             self.particles.append(p)
-            
+        
+        # Random particles with bias towards good regions
         for _ in range(n_random):
             p = Particle(problem, distance_matrix, time_matrix)
-            # Truly random initialization
-            p.position = np.random.random(size=len(problem.customers))
+            if np.random.random() < 0.7:
+                # Blend of nearest and savings
+                blend = np.random.random()
+                p.position = np.clip(
+                    blend * base_nearest + (1-blend) * base_savings + 
+                    np.random.normal(0, 0.1, size=len(base_nearest)), 
+                    0, 1
+                )
+            else:
+                # Pure random with slight bias towards middle values
+                p.position = np.random.beta(2, 2, size=len(base_nearest))
             self.particles.append(p)
 
         self.global_best_position = None

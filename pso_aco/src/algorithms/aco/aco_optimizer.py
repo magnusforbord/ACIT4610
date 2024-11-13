@@ -1,4 +1,5 @@
 from src.algorithms.base import BaseOptimizer, Solution
+from ...utils.aco_visualizer import ACOVisualizer
 from .colony import Colony
 import numpy as np
 from typing import List, Tuple
@@ -28,6 +29,9 @@ class ACOOptimizer(BaseOptimizer):
         best_solution = None
         best_distance = float('inf')
         no_improvement = 0
+
+        # Initialize visualizer
+        visualizer = ACOVisualizer(self.problem, self.distance_matrix)
         
         start_time = time.time()
         for iteration in range(max_iterations):
@@ -51,12 +55,26 @@ class ACOOptimizer(BaseOptimizer):
             # Update pheromone trails
             solution_costs = [self.calculate_total_distance(s) for s in solutions]
             self.colony.update_pheromone(solutions, solution_costs)
+
+                        # Record state for visualization
+            if best_solution:  # Only record if we have a valid solution
+                visualizer.record_state(
+                    self.colony.pheromone,
+                    best_distance,
+                    best_solution
+                )
             
         end_time = time.time()
         print(f"\nOptimization completed in {end_time - start_time:.2f} seconds")
         print("\nOptimal Solution:")
         print(f"Total Distance: {best_distance:.2f}")
         print(f"Number of Routes: {len(best_solution)}")
+
+          # Generate visualizations
+        visualizer.plot_pheromone_evolution('results/pheromone_evolution.png')
+        visualizer.plot_convergence('results/convergence.png')
+        visualizer.create_route_animation('results/route_evolution.gif')
+        visualizer.animate_pheromone_evolution('results/pheromone_evolution.gif')
 
         for i, route in enumerate(best_solution, start=1):
             total_load = sum(self.problem.customers[customer-1].demand for customer in route)
