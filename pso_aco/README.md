@@ -21,15 +21,58 @@ pytest>=7.4.3
 ```
 
 ## Installation
+
+### Project Setup
 1. Clone the repository:
 ```bash
-git clone 
-cd acit4610/pso_aco
+git clone repo
+cd pso_aco
 ```
 
-2. Install dependencies:
+### Setting up Virtual Environment
+1. Make sure you have Python 3.8+ installed:
+```bash
+python --version
+```
+
+2. Install virtualenv if you haven't:
+```bash
+pip install virtualenv
+```
+
+3. Create a virtual environment in the project directory:
+```bash
+# Windows
+python -m venv venv
+
+# Linux/Mac
+python3 -m venv venv
+```
+
+4. Activate the virtual environment:
+```bash
+# Windows
+venv\Scripts\activate
+
+# Linux/Mac
+source venv/bin/activate
+```
+
+5. Your prompt should change to show you're working in the virtual environment:
+```bash
+(venv) C:\path\to\pso_aco>
+```
+
+### Installing Dependencies
+1. With your virtual environment activated, install dependencies:
 ```bash
 pip install -r requirements.txt
+```
+
+### Deactivating Virtual Environment
+When you're done working on the project:
+```bash
+deactivate
 ```
 
 ## Usage
