@@ -30,7 +30,7 @@ for algo_name, file_name in algorithms.items():
     file_path = os.path.join(results_dir, file_name)
     if os.path.exists(file_path):
         df = pd.read_csv(file_path)
-        df['Algorithm'] = algo_name  # Add a column for algorithm name
+        df['Algorithm'] = algo_name
         all_results[algo_name] = df
     else:
         print(f"File not found: {file_path}")
@@ -50,14 +50,12 @@ os.makedirs(figures_dir, exist_ok=True)
 # Function to calculate mean values for each algorithm
 def calculate_means(combined_results):
     # Exclude non-numeric columns and columns not needed for mean calculation
-    cols_to_exclude = ['Run', 'Weights', 'Algorithm']  # Exclude 'Algorithm' here
+    cols_to_exclude = ['Run', 'Weights', 'Algorithm']
     # Select columns to include
     cols_to_include = [col for col in combined_results.columns if col not in cols_to_exclude]
     # Compute the mean
     means = combined_results.groupby('Algorithm')[cols_to_include].mean().reset_index()
     return means
-
-
 
 
 # Calculate mean values
@@ -92,7 +90,7 @@ sns.barplot(
     dodge=False,
     palette='coolwarm'
 )
-plt.legend([],[], frameon=False)  # Hide the legend if not needed
+plt.legend([],[], frameon=False)
 plt.title('Best Fitness Comparison')
 plt.xticks(rotation=45)
 plt.tight_layout()
@@ -189,7 +187,15 @@ else:
 # --- Visualization 5: Boxplot of Best Fitness per Algorithm ---
 
 plt.figure(figsize=(12, 6))
-sns.boxplot(data=combined_results, x='Algorithm', y='Best Fitness', palette='Set3')
+sns.boxplot(
+    data=combined_results,
+    x='Algorithm',
+    y='Best Fitness',
+    hue='Algorithm',
+    palette='Set3',
+    dodge=False
+)
+plt.legend([],[], frameon=False)
 plt.title('Distribution of Best Fitness per Algorithm')
 plt.xticks(rotation=45)
 plt.tight_layout()
@@ -199,13 +205,41 @@ plt.show()
 # --- Visualization 6: Training Time per Run per Algorithm ---
 
 plt.figure(figsize=(12, 6))
-sns.boxplot(data=combined_results, x='Algorithm', y='Training Time', palette='Set2')
+sns.boxplot(
+    data=combined_results,
+    x='Algorithm',
+    y='Training Time',
+    hue='Algorithm',
+    palette='Set2',
+    dodge=False
+)
 plt.title('Training Time per Run per Algorithm')
 plt.xticks(rotation=45)
 plt.ylabel('Training Time (seconds)')
 plt.tight_layout()
 plt.savefig(os.path.join(figures_dir, 'training_time_boxplot.png'))
 plt.show()
+
+# --- Visualization 7: Histogram of Expected Returns ---
+
+plt.figure(figsize=(12, 6))
+sns.histplot(
+    data=combined_results,
+    x='Expected Return',
+    hue='Algorithm',
+    multiple='stack',
+    palette='husl',
+    bins=20,
+    edgecolor='black'
+)
+plt.title('Histogram of Expected Returns Across Runs')
+plt.xlabel('Expected Return')
+plt.ylabel('Frequency')
+plt.legend(title='Algorithm', bbox_to_anchor=(1.05, 1), loc='upper left')
+plt.tight_layout()
+plt.savefig(os.path.join(figures_dir, 'expected_returns_histogram.png'))
+plt.show()
+
 
 # --- Additional Statistical Test: Pairwise Comparisons ---
 

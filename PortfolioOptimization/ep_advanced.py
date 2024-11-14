@@ -14,14 +14,12 @@ os.makedirs(results_dir, exist_ok=True)
 
 # Load monthly returns
 monthly_returns = pd.read_csv(os.path.join(data_dir, 'monthly_returns.csv'), index_col=0)
-mean_returns = monthly_returns.mean().values  # Convert to numpy array
+mean_returns = monthly_returns.mean().values
 covariance_matrix = pd.read_csv(os.path.join(data_dir, 'covariance_matrix.csv'), index_col=0).values
 
-def fitness_function(weights, mean_returns, covariance_matrix, risk_aversion):
+def fitness_function(weights, mean_returns):
     expected_return = np.dot(weights, mean_returns)
-    portfolio_variance = np.dot(weights.T, np.dot(covariance_matrix, weights))
-    fitness = expected_return - risk_aversion * portfolio_variance
-    return fitness
+    return expected_return
 
 def initialize_population(pop_size, num_assets):
     population = []
@@ -62,7 +60,7 @@ def elitism(population, fitnesses, num_elites):
     elites = [population[i] for i in sorted_indices[:num_elites]]
     return elites
 
-def evolutionary_programming(mean_returns, covariance_matrix, num_assets, pop_size=50, num_generations=100, risk_aversion=3, tau=None, tau_prime=None, tournament_size=3, num_elites=2):
+def evolutionary_programming(mean_returns, num_assets, pop_size=50, num_generations=100, tau=None, tau_prime=None, tournament_size=3, num_elites=2):
     if tau is None:
         tau = 1 / np.sqrt(2 * np.sqrt(num_assets))
     if tau_prime is None:
@@ -72,7 +70,7 @@ def evolutionary_programming(mean_returns, covariance_matrix, num_assets, pop_si
     mean_fitness_history = []
 
     for generation in range(1, num_generations + 1):
-        fitnesses = np.array([fitness_function(ind['weights'], mean_returns, covariance_matrix, risk_aversion) for ind in population])
+        fitnesses = np.array([fitness_function(ind['weights'], mean_returns) for ind in population])
         # Record best and mean fitness for this generation
         best_fitness = np.max(fitnesses)
         mean_fitness = np.mean(fitnesses)
@@ -89,7 +87,7 @@ def evolutionary_programming(mean_returns, covariance_matrix, num_assets, pop_si
         population = elites + offspring[:pop_size - num_elites]
 
     # After evolution, select the best individual
-    final_fitnesses = np.array([fitness_function(ind['weights'], mean_returns, covariance_matrix, risk_aversion) for ind in population])
+    final_fitnesses = np.array([fitness_function(ind['weights'], mean_returns) for ind in population])
     best_index = np.argmax(final_fitnesses)
     best_individual = population[best_index]
     best_fitness = final_fitnesses[best_index]
@@ -107,8 +105,8 @@ if __name__ == "__main__":
         start_time = time.time()
 
         best_individual, best_fitness, mean_fitness = evolutionary_programming(
-            mean_returns, covariance_matrix, num_assets,
-            pop_size=50, num_generations=100, risk_aversion=3,
+            mean_returns, num_assets,
+            pop_size=50, num_generations=100,
             tournament_size=3, num_elites=2
         )
 
@@ -121,10 +119,10 @@ if __name__ == "__main__":
 
         results.append([
             run,
-            best_fitness,           # Best Fitness
-            mean_fitness,           # Mean Fitness of final generation
-            expected_return,        # Expected Return
-            portfolio_variance,     # Portfolio Variance
+            best_fitness,
+            mean_fitness,
+            expected_return,
+            portfolio_variance,
             weights.tolist(),
             training_time
         ])

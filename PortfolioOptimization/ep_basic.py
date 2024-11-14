@@ -110,7 +110,7 @@ def evolutionary_programming(mean_returns, covariance_matrix, num_assets, pop_si
     # Mean fitness of the final generation
     mean_fitness_final_gen = np.mean(final_fitness)
 
-    return best_weights, best_return, portfolio_variance, best_return, mean_fitness_final_gen
+    return best_weights, best_return, portfolio_variance, mean_fitness_final_gen
 
 if __name__ == "__main__":
     num_assets = len(mean_returns)
