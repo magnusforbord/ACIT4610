@@ -50,14 +50,12 @@ os.makedirs(figures_dir, exist_ok=True)
 # Function to calculate mean values for each algorithm
 def calculate_means(combined_results):
     # Exclude non-numeric columns and columns not needed for mean calculation
-    cols_to_exclude = ['Run', 'Weights', 'Algorithm']  # Exclude 'Algorithm' here
+    cols_to_exclude = ['Run', 'Weights', 'Algorithm']
     # Select columns to include
     cols_to_include = [col for col in combined_results.columns if col not in cols_to_exclude]
     # Compute the mean
     means = combined_results.groupby('Algorithm')[cols_to_include].mean().reset_index()
     return means
-
-
 
 
 # Calculate mean values
@@ -92,7 +90,7 @@ sns.barplot(
     dodge=False,
     palette='coolwarm'
 )
-plt.legend([],[], frameon=False)  # Hide the legend if not needed
+plt.legend([],[], frameon=False)
 plt.title('Best Fitness Comparison')
 plt.xticks(rotation=45)
 plt.tight_layout()

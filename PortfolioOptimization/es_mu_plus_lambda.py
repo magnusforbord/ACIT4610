@@ -14,7 +14,7 @@ os.makedirs(results_dir, exist_ok=True)
 
 # Load monthly returns
 monthly_returns = pd.read_csv(os.path.join(data_dir, 'monthly_returns.csv'), index_col=0)
-mean_returns = monthly_returns.mean().values  # Convert to numpy array
+mean_returns = monthly_returns.mean().values
 covariance_matrix = pd.read_csv(os.path.join(data_dir, 'covariance_matrix.csv'), index_col=0).values
 
 def objective_function(weights, mean_returns):

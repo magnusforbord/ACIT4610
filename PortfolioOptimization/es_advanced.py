@@ -102,7 +102,6 @@ def evolution_strategies(mean_returns, num_assets, mu=20, lambda_=80, num_genera
         mean_fitness_history.append(mean_fitness)
         # Select the next generation
         population = select_population(combined_population, fitnesses, mu)
-        # Optionally, print progress
         # print(f"Generation {generation}/{num_generations}, Best Fitness: {best_fitness:.6f}")
     # After evolution, select the best individual
     final_fitnesses = np.array([
