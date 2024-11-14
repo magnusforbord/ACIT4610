@@ -19,12 +19,12 @@ def main():
         distance_matrix=dist_matrix,
         time_matrix=time_matrix,
         n_ants=50,  
-        alpha=1.0, #Importance of pheromones
+        alpha=1.0,  #Importance of pheromones
         beta=2.0,   #Importance of heuristic
         rho=0.1     #Pheromone evaporation rate
     )
     
-    solution,distances, time = aco.optimize(max_iterations=5) #Number of iterations 
+    solution,distances, time = aco.optimize(max_iterations=50) #Number of iterations 
     
     print("\nResults:")
     print(f"Feasible: {solution.feasible}")

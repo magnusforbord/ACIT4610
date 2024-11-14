@@ -78,11 +78,11 @@ class ACOOptimizer(BaseOptimizer):
         print(f"Total Distance: {best_distance:.2f}")
         print(f"Number of Routes: {len(best_solution)}")
 
-          # Generate visualizations
-        #visualizer.plot_pheromone_evolution('results/pheromone_evolution.png')
-       #visualizer.plot_convergence('results/convergence.png')
-       # visualizer.create_route_animation('results/route_evolution.gif')
-       # visualizer.animate_pheromone_evolution('results/pheromone_evolution.gif')
+        # Generate visualizations
+        visualizer.plot_pheromone_evolution('results/pheromone_evolution.png')
+        visualizer.plot_convergence('results/convergence.png')
+        visualizer.create_route_animation('results/route_evolution.gif')
+        visualizer.animate_pheromone_evolution('results/pheromone_evolution.gif')
 
         for i, route in enumerate(best_solution, start=1):
             total_load = sum(self.problem.customers[customer-1].demand for customer in route)

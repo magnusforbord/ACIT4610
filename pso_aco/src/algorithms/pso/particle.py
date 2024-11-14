@@ -346,10 +346,6 @@ class Particle:
         velocity = w * random_component + cognitive + social
         self.position = np.clip(self.position + velocity, 0, 1)
 
-    def update_position(self):
-        """Basic PSO position update"""
-        pass
-
     def evaluate(self) -> float:
         routes = self._decode_position()
         if not routes:

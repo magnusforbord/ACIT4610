@@ -215,15 +215,3 @@ class Swarm:
                 n_stagnant += 1
             last_best = self.global_best_fitness
                 
-    def _reinitialize_worst_particles(self):
-        """Reinitialize worst performing particles"""
-        n_reinit = max(3, len(self.particles) // 10)  # Reinit 10% of particles
-        sorted_particles = sorted(self.particles, key=lambda p: p.best_fitness, reverse=True)
-        
-        for particle in sorted_particles[:n_reinit]:
-            if np.random.random() < 0.5:
-                particle.position = particle._nearest_neighbor_init()
-            else:
-                particle.position = self._savings_based_init()
-            particle.velocity = np.random.uniform(-0.4, 0.4, size=len(particle.position))
-

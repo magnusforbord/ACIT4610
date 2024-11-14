@@ -74,56 +74,6 @@ class PSOOptimizer(BaseOptimizer):
             routes[route_idx] = self._apply_or_opt(routes[route_idx])
         
         return routes
-    def _calculate_arrival_times(self, routes: List[List[int]]) -> List[List[float]]:
-        """Calculate arrival times for all routes"""
-        arrival_times = []
-        for route in routes:
-            times = []
-            current_time = 0
-            current_pos = 0
-            
-            for customer_id in route:
-                customer = self.problem.customers[customer_id-1]
-                travel_time = self.time_matrix[current_pos][customer_id]
-                arrival_time = current_time + travel_time
-                
-                times.append(arrival_time)
-                current_time = max(arrival_time, customer.ready_time) + customer.service_time
-                current_pos = customer_id
-                
-            arrival_times.append(times)
-        return arrival_times
-
-    def _update_arrival_times(self, route: List[int]) -> List[float]:
-        """Update arrival times for a single route"""
-        times = []
-        current_time = 0
-        current_pos = 0
-        
-        for customer_id in route:
-            customer = self.problem.customers[customer_id-1]
-            travel_time = self.time_matrix[current_pos][customer_id]
-            arrival_time = current_time + travel_time
-            
-            times.append(arrival_time)
-            current_time = max(arrival_time, customer.ready_time) + customer.service_time
-            current_pos = customer_id
-            
-        return times
-
-    def _calculate_route_loads(self, routes: List[List[int]]) -> List[float]:
-        """Calculate cumulative loads for all routes"""
-        route_loads = []
-        for route in routes:
-            loads = [sum(self.problem.customers[c-1].demand for c in route[:i+1])
-                    for i in range(len(route))]
-            route_loads.append(loads)
-        return route_loads
-
-    def _update_capacity(self, route: List[int]) -> List[float]:
-        """Update cumulative loads for a single route"""
-        return [sum(self.problem.customers[c-1].demand for c in route[:i+1])
-                for i in range(len(route))]
 
     def _is_insertion_feasible(self, 
                              customer: int,
