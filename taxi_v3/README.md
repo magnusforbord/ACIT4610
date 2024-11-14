@@ -1,10 +1,10 @@
-Here’s a revised and simplified README with a section on setting up a virtual environment:
 
-Taxi-v3 Autonomous Agent
+Solving a Real World Problem Using Reinforcement Learning
 
 This project develops an autonomous agent to operate within OpenAI Gym’s Taxi-v3 environment, where a taxi must navigate a grid, pick up passengers, and drop them off at specific locations. The goal is to train the agent to complete tasks with minimal steps and maximum rewards, simulating an efficient taxi service within a restricted environment.
 
-The notebook implements three reinforcement learning (RL) algorithms—Q-learning, SARSA, and REINFORCE—and evaluates their performance on the Taxi-v3 environment. The notebook is divided into three main parts: Q-learning Implementation and Training, Agent Evaluation, and Optimization with Alternative Algorithms.
+The notebook implements three reinforcement learning (RL) algorithms:
+Q-learning, SARSA, and REINFORCE, and evaluates their performance on the Taxi-v3 environment. The notebook is divided into three main parts: Q-learning Implementation and Training, Agent Evaluation, and Optimization with Alternative Algorithms.
 
 Project Structure
 
@@ -87,4 +87,3 @@ The notebook includes visualizations comparing:
 
 The results are saved as .png files in the results folder.
 
-This README provides clear steps for setup, an overview of the approach, and instructions for running the notebook and understanding the results. Let me know if you’d like further customization!
