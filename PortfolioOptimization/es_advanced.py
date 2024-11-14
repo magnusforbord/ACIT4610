@@ -17,11 +17,9 @@ monthly_returns = pd.read_csv(os.path.join(data_dir, 'monthly_returns.csv'), ind
 mean_returns = monthly_returns.mean().values  # Convert to numpy array
 covariance_matrix = pd.read_csv(os.path.join(data_dir, 'covariance_matrix.csv'), index_col=0).values
 
-def fitness_function(weights, mean_returns, covariance_matrix, risk_aversion):
+def fitness_function(weights, mean_returns):
     expected_return = np.dot(weights, mean_returns)
-    portfolio_variance = np.dot(weights.T, np.dot(covariance_matrix, weights))
-    fitness = expected_return - risk_aversion * portfolio_variance
-    return fitness
+    return expected_return
 
 def initialize_population(mu, num_assets):
     population = []
@@ -70,7 +68,7 @@ def select_population(population, fitnesses, mu):
     selected = [population[i] for i in sorted_indices[:mu]]
     return selected
 
-def evolution_strategies(mean_returns, covariance_matrix, num_assets, mu=20, lambda_=80, num_generations=100, risk_aversion=3):
+def evolution_strategies(mean_returns, num_assets, mu=20, lambda_=80, num_generations=100):
     # Learning rates for mutation strengths
     tau = 1 / np.sqrt(2 * np.sqrt(num_assets))
     tau_prime = 1 / np.sqrt(2 * num_assets)
@@ -94,7 +92,7 @@ def evolution_strategies(mean_returns, covariance_matrix, num_assets, mu=20, lam
         combined_population = population + offspring
         # Evaluate fitness
         fitnesses = np.array([
-            fitness_function(individual['weights'], mean_returns, covariance_matrix, risk_aversion)
+            fitness_function(individual['weights'], mean_returns)
             for individual in combined_population
         ])
         # Record best and mean fitness
@@ -104,11 +102,10 @@ def evolution_strategies(mean_returns, covariance_matrix, num_assets, mu=20, lam
         mean_fitness_history.append(mean_fitness)
         # Select the next generation
         population = select_population(combined_population, fitnesses, mu)
-        # Optionally, print progress
         # print(f"Generation {generation}/{num_generations}, Best Fitness: {best_fitness:.6f}")
     # After evolution, select the best individual
     final_fitnesses = np.array([
-        fitness_function(individual['weights'], mean_returns, covariance_matrix, risk_aversion)
+        fitness_function(individual['weights'], mean_returns)
         for individual in population
     ])
     best_index = np.argmax(final_fitnesses)
@@ -132,12 +129,10 @@ if __name__ == "__main__":
 
         best_individual, best_fitness, mean_fitness = evolution_strategies(
             mean_returns,
-            covariance_matrix,
             num_assets,
             mu=mu,
             lambda_=lambda_,
             num_generations=num_generations,
-            risk_aversion=3
         )
 
         end_time = time.time()
