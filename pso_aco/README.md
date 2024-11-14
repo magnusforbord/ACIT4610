@@ -24,7 +24,7 @@ pytest>=7.4.3
 1. Clone the repository:
 ```bash
 git clone 
-cd pso_aco
+cd acit4610/pso_aco
 ```
 
 2. Install dependencies:
