@@ -24,7 +24,7 @@ def main():
         rho=0.1     #Pheromone evaporation rate
     )
     
-    solution = aco.optimize(max_iterations=20) #Number of iterations 
+    solution,distances, time = aco.optimize(max_iterations=5) #Number of iterations 
     
     print("\nResults:")
     print(f"Feasible: {solution.feasible}")

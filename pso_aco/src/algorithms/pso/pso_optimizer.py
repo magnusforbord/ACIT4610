@@ -257,8 +257,8 @@ class PSOOptimizer(BaseOptimizer):
         print(f"Best distance across attempts: {best_distance:.2f}")
         print(f"Routes: {len(best_solution) if best_solution else 0}/{self.problem.vehicles}")
         
-       # visualizer.plot_convergence('results/pso_convergence.png')
-       # visualizer.create_route_animation('results/pso_route_evolution.gif')
+        visualizer.plot_convergence('results/pso_convergence.png')
+        visualizer.create_route_animation('results/pso_route_evolution.gif')
 
         solution = Solution(
             routes=best_solution,

@@ -25,7 +25,7 @@ def main():
         c2=1.5    # Decrease social component initially
     )
     
-    solution = pso.optimize(max_iterations=50)
+    solution, times, distances = pso.optimize(max_iterations=50)
     
     # Plot solution routes
     plt.figure(figsize=(15, 5))
