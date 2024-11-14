@@ -23,8 +23,8 @@ pytest>=7.4.3
 ## Installation
 1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd vrptw-optimizer
+git clone 
+cd pso_aco
 ```
 
 2. Install dependencies:
@@ -37,7 +37,7 @@ pip install -r requirements.txt
 ```python
 python run_aco.py
 ```
-
+The number of iterations and parameters can be changed in each of the run_aco and run_pso files. 
 ### Running PSO Solver
 ```python
 python run_pso.py
