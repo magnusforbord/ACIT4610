@@ -170,6 +170,9 @@ class PSOOptimizer(BaseOptimizer):
     
 
     def optimize(self, max_iterations: int) -> Solution:
+
+        distances = []
+        times = []
         # Initialize visualizer
         visualizer = PSOVisualizer(self.problem, self.distance_matrix)
         
@@ -216,6 +219,9 @@ class PSOOptimizer(BaseOptimizer):
                     
                     current_distance = self.swarm.global_best_fitness
                     current_routes = self.swarm.global_best_routes
+
+                    distances.append(current_distance)
+                    times.append(time.time() - start_time)
                     
                     if current_routes and len(current_routes) <= self.problem.vehicles:
                         if current_distance < best_distance:
@@ -251,14 +257,16 @@ class PSOOptimizer(BaseOptimizer):
         print(f"Best distance across attempts: {best_distance:.2f}")
         print(f"Routes: {len(best_solution) if best_solution else 0}/{self.problem.vehicles}")
         
-        visualizer.plot_convergence('results/pso_convergence.png')
-        visualizer.create_route_animation('results/pso_route_evolution.gif')
+       # visualizer.plot_convergence('results/pso_convergence.png')
+       # visualizer.create_route_animation('results/pso_route_evolution.gif')
 
-        return Solution(
+        solution = Solution(
             routes=best_solution,
             total_distance=best_distance,
             feasible=bool(best_solution)
         )
+
+        return solution, distances, times
 
     def calculate_total_distance(self, routes: List[List[int]]) -> float:
         """Calculate total distance for all routes"""
