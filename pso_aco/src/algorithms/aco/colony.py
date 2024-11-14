@@ -12,6 +12,13 @@ class Colony:
                  alpha: float = 1.0,
                  beta: float = 2.0,
                  rho: float = 0.1):
+        
+        """Initialize ant colony for VRPTW optimization.
+        
+        Args:
+            alpha: Controls influence of pheromone trails
+            beta: Controls influence of heuristic information
+            rho: Pheromone evaporation rate"""
         self.problem = problem
         self.n_ants = n_ants
         self.distance_matrix = distance_matrix
@@ -36,7 +43,10 @@ class Colony:
         return solutions
     
     def update_pheromone(self, solutions: List[List[List[int]]], solution_costs: List[float]):
-        """Update pheromone levels based on complete solutions."""
+        """Update pheromone levels using completed solutions.
+        
+        Applies evaporation to existing trails and deposits new pheromone
+        based on solution quality."""
         # Evaporation
         self.pheromone *= (1 - self.rho)
         

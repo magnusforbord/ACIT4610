@@ -4,7 +4,9 @@ from src.utils.data_loader import Problem
 
 class Ant:
     def __init__(self, problem: Problem, distance_matrix: np.ndarray, time_matrix: np.ndarray):
-        """Initialize ant with problem instance and distance/time matrices."""
+        """Creates an ant agent for solving VRPTW.
+        Each ant represents a potential solution constructor that builds routes
+        while respecting vehicle capacity and time window constraints."""
         self.problem = problem
         self.distance_matrix = distance_matrix
         self.time_matrix = time_matrix
@@ -20,6 +22,9 @@ class Ant:
         self.current_capacity = self.problem.capacity
 
     def construct_solution(self, pheromone: np.ndarray, alpha: float, beta: float) -> list[list[int]]:
+        """ Constructs a complete solution (set of routes) using ACO principles.
+            Uses pheromone levels and heuristic information to probabilistically build routes
+            that satisfy problem constraints."""
         self.reset()
         available_vehicles = self.problem.vehicles
         
@@ -56,6 +61,9 @@ class Ant:
         return self.routes
     
     def select_next_customer(self, pheromone: np.ndarray, alpha: float, beta: float) -> int:
+        """Selects next customer using ACO probability rules.
+        Combines pheromone levels with heuristic information about distance,
+        time windows, and capacity to make selection."""
         if not self.unvisited:
             return 0
             
@@ -117,7 +125,7 @@ class Ant:
         return np.random.choice(candidates, p=probabilities)
     
     def _is_feasible(self, next_customer: int) -> bool:
-        """Check all feasibility constraints."""
+        """Checks if adding next_customer violates any constraints."""
         customer = self.problem.customers[next_customer-1]
         
         # Check capacity
@@ -141,7 +149,7 @@ class Ant:
         return True
     
     def _is_time_feasible(self, next_customer: int) -> bool:
-        """Detailed time window feasibility check."""
+        """Checks time window feasibility for next customer."""
         customer = self.problem.customers[next_customer-1]
         travel_time = self.time_matrix[self.current_pos][next_customer]
         arrival_time = self.current_time + travel_time

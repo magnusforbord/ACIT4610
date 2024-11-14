@@ -14,6 +14,8 @@ class ACOOptimizer(BaseOptimizer):
                  alpha: float = 1.0,
                  beta: float = 5.0,
                  rho: float = 0.1):
+        """Initialize ACO optimizer with problem instance and parameters."""
+
         super().__init__(problem, distance_matrix, time_matrix)
         self.colony = Colony(
             problem=problem,
@@ -26,6 +28,10 @@ class ACOOptimizer(BaseOptimizer):
         )
         
     def optimize(self, max_iterations: int) -> Solution:
+        """Execute ACO optimization process.
+        
+        Constructs and improves solutions while tracking performance metrics
+        and generating visualizations."""
         best_solution = None
         best_distance = float('inf')
         no_improvement = 0

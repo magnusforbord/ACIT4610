@@ -14,6 +14,7 @@ class PSOOptimizer(BaseOptimizer):
                  w: float = 0.6,
                  c1: float = 1.8,
                  c2: float = 1.8):
+        """Initialize PSO optimizer for VRPTW."""
         super().__init__(problem, distance_matrix, time_matrix)
         self.swarm = Swarm(
             problem=problem,
@@ -60,6 +61,7 @@ class PSOOptimizer(BaseOptimizer):
         return final_time <= self.problem.depot.due_time
 
     def _apply_local_search(self, routes: List[List[int]]) -> List[List[int]]:
+        """Apply local search improvement to a subset of routes."""
         if not routes:
             return routes
             
@@ -120,7 +122,7 @@ class PSOOptimizer(BaseOptimizer):
     
 
     def optimize(self, max_iterations: int) -> Solution:
-
+        """Execute PSO optimization with local search enhancement."""
         distances = []
         times = []
         # Initialize visualizer
@@ -252,7 +254,7 @@ class PSOOptimizer(BaseOptimizer):
         return distance
     
     def _apply_2opt(self, route: List[int]) -> List[int]:
-        """2-opt local search for single route"""
+        """2-opt local search for route improvement."""
         if len(route) < 3:
             return route
             
