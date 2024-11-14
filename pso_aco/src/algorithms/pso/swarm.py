@@ -12,6 +12,8 @@ class Swarm:
             w: float = 0.9,
             c1: float = 2.0,
             c2: float = 2.0):
+        
+        """Initialize PSO swarm with structured diversity in initial population."""
         np.random.seed(int(time.time() * 1000) % 2**32)
         
         self.problem = problem
@@ -162,6 +164,7 @@ class Swarm:
         return np.clip(position, 0, 1)
         
     def optimize(self, iterations: int = 1):
+        """Execute PSO optimization with adaptive parameters and diversity management."""
         diversity_threshold = 0.15
         n_stagnant = 0
         max_stagnant = 15  # Increased patience
@@ -215,15 +218,3 @@ class Swarm:
                 n_stagnant += 1
             last_best = self.global_best_fitness
                 
-    def _reinitialize_worst_particles(self):
-        """Reinitialize worst performing particles"""
-        n_reinit = max(3, len(self.particles) // 10)  # Reinit 10% of particles
-        sorted_particles = sorted(self.particles, key=lambda p: p.best_fitness, reverse=True)
-        
-        for particle in sorted_particles[:n_reinit]:
-            if np.random.random() < 0.5:
-                particle.position = particle._nearest_neighbor_init()
-            else:
-                particle.position = self._savings_based_init()
-            particle.velocity = np.random.uniform(-0.4, 0.4, size=len(particle.position))
-

@@ -14,6 +14,7 @@ class PSOOptimizer(BaseOptimizer):
                  w: float = 0.6,
                  c1: float = 1.8,
                  c2: float = 1.8):
+        """Initialize PSO optimizer for VRPTW."""
         super().__init__(problem, distance_matrix, time_matrix)
         self.swarm = Swarm(
             problem=problem,
@@ -60,6 +61,7 @@ class PSOOptimizer(BaseOptimizer):
         return final_time <= self.problem.depot.due_time
 
     def _apply_local_search(self, routes: List[List[int]]) -> List[List[int]]:
+        """Apply local search improvement to a subset of routes."""
         if not routes:
             return routes
             
@@ -74,56 +76,6 @@ class PSOOptimizer(BaseOptimizer):
             routes[route_idx] = self._apply_or_opt(routes[route_idx])
         
         return routes
-    def _calculate_arrival_times(self, routes: List[List[int]]) -> List[List[float]]:
-        """Calculate arrival times for all routes"""
-        arrival_times = []
-        for route in routes:
-            times = []
-            current_time = 0
-            current_pos = 0
-            
-            for customer_id in route:
-                customer = self.problem.customers[customer_id-1]
-                travel_time = self.time_matrix[current_pos][customer_id]
-                arrival_time = current_time + travel_time
-                
-                times.append(arrival_time)
-                current_time = max(arrival_time, customer.ready_time) + customer.service_time
-                current_pos = customer_id
-                
-            arrival_times.append(times)
-        return arrival_times
-
-    def _update_arrival_times(self, route: List[int]) -> List[float]:
-        """Update arrival times for a single route"""
-        times = []
-        current_time = 0
-        current_pos = 0
-        
-        for customer_id in route:
-            customer = self.problem.customers[customer_id-1]
-            travel_time = self.time_matrix[current_pos][customer_id]
-            arrival_time = current_time + travel_time
-            
-            times.append(arrival_time)
-            current_time = max(arrival_time, customer.ready_time) + customer.service_time
-            current_pos = customer_id
-            
-        return times
-
-    def _calculate_route_loads(self, routes: List[List[int]]) -> List[float]:
-        """Calculate cumulative loads for all routes"""
-        route_loads = []
-        for route in routes:
-            loads = [sum(self.problem.customers[c-1].demand for c in route[:i+1])
-                    for i in range(len(route))]
-            route_loads.append(loads)
-        return route_loads
-
-    def _update_capacity(self, route: List[int]) -> List[float]:
-        """Update cumulative loads for a single route"""
-        return [sum(self.problem.customers[c-1].demand for c in route[:i+1])
-                for i in range(len(route))]
 
     def _is_insertion_feasible(self, 
                              customer: int,
@@ -170,7 +122,7 @@ class PSOOptimizer(BaseOptimizer):
     
 
     def optimize(self, max_iterations: int) -> Solution:
-
+        """Execute PSO optimization with local search enhancement."""
         distances = []
         times = []
         # Initialize visualizer
@@ -302,7 +254,7 @@ class PSOOptimizer(BaseOptimizer):
         return distance
     
     def _apply_2opt(self, route: List[int]) -> List[int]:
-        """2-opt local search for single route"""
+        """2-opt local search for route improvement."""
         if len(route) < 3:
             return route
             
