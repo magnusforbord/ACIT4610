@@ -10,3 +10,5 @@ __pycache__/
 
 # Ignore other common temporary files
 *.swp
+
+pso_aco/experiment_results/

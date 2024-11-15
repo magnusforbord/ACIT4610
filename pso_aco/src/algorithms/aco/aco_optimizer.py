@@ -14,6 +14,8 @@ class ACOOptimizer(BaseOptimizer):
                  alpha: float = 1.0,
                  beta: float = 5.0,
                  rho: float = 0.1):
+        """Initialize ACO optimizer with problem instance and parameters."""
+
         super().__init__(problem, distance_matrix, time_matrix)
         self.colony = Colony(
             problem=problem,
@@ -26,10 +28,19 @@ class ACOOptimizer(BaseOptimizer):
         )
         
     def optimize(self, max_iterations: int) -> Solution:
+        """Execute ACO optimization process.
+        
+        Constructs and improves solutions while tracking performance metrics
+        and generating visualizations."""
         best_solution = None
         best_distance = float('inf')
         no_improvement = 0
 
+        # For tracking
+        distances = []
+        times = []
+        start_time = time.time()
+        
         # Initialize visualizer
         visualizer = ACOVisualizer(self.problem, self.distance_matrix)
         
@@ -56,7 +67,10 @@ class ACOOptimizer(BaseOptimizer):
             solution_costs = [self.calculate_total_distance(s) for s in solutions]
             self.colony.update_pheromone(solutions, solution_costs)
 
-                        # Record state for visualization
+            distances.append(best_distance)  # Record current best distance
+            times.append(time.time() - start_time)  # Record elapsed time
+
+            # Record state for visualization
             if best_solution:  # Only record if we have a valid solution
                 visualizer.record_state(
                     self.colony.pheromone,
@@ -70,7 +84,7 @@ class ACOOptimizer(BaseOptimizer):
         print(f"Total Distance: {best_distance:.2f}")
         print(f"Number of Routes: {len(best_solution)}")
 
-          # Generate visualizations
+        # Generate visualizations
         visualizer.plot_pheromone_evolution('results/pheromone_evolution.png')
         visualizer.plot_convergence('results/convergence.png')
         visualizer.create_route_animation('results/route_evolution.gif')
@@ -114,11 +128,13 @@ class ACOOptimizer(BaseOptimizer):
             if time_feasible:
                 print("  Time Constraints Satisfied")
     
-        return Solution(
+        solution = Solution(
             routes=best_solution if best_solution else [],
             total_distance=best_distance if best_solution else float('inf'),
             feasible=True if best_solution else False
         )
+    
+        return solution, distances, times
     
     def calculate_total_distance(self, routes: List[List[int]]) -> float:
         """Calculate total distance for all routes."""

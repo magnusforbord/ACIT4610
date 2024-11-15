@@ -4,12 +4,12 @@ from src.utils.data_loader import Problem
 
 class Particle:
     def __init__(self, problem: Problem, distance_matrix: np.ndarray, time_matrix: np.ndarray):
+        """PSO particle for VRPTW optimization encoding customer visit priorities."""
         self.problem = problem
         self.distance_matrix = distance_matrix
         self.time_matrix = time_matrix
         self.n_customers = len(problem.customers)
-        
-        # Initialize position as permutation of customer indices
+
         self.position = np.arange(self.n_customers, dtype=int)
         np.random.shuffle(self.position)
         self.best_position = self.position.copy()
@@ -18,7 +18,7 @@ class Particle:
 
         
     def _initialize_position(self) -> np.ndarray:
-        """Initialize particle position using modified nearest neighbor heuristic"""
+        """Initialize particle using modified nearest neighbor heuristic with randomization."""
         position = np.zeros(len(self.problem.customers))
         unvisited = set(range(len(self.problem.customers)))
         current = 0  # Start at depot
@@ -331,6 +331,7 @@ class Particle:
         return routes
 
     def update_velocity(self, w: float, c1: float, c2: float, global_best_position: np.ndarray):
+        """Update particle velocity using PSO equations with adaptive components."""
         r1, r2 = np.random.random(2)
         
         # Increase exploitation as iterations progress
@@ -346,11 +347,8 @@ class Particle:
         velocity = w * random_component + cognitive + social
         self.position = np.clip(self.position + velocity, 0, 1)
 
-    def update_position(self):
-        """Basic PSO position update"""
-        pass
-
     def evaluate(self) -> float:
+        """Evaluate particle's fitness based on route quality."""
         routes = self._decode_position()
         if not routes:
             return float('inf')

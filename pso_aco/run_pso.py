@@ -19,40 +19,14 @@ def main():
         problem=problem,
         distance_matrix=dist_matrix,
         time_matrix=time_matrix,
-        n_particles=200,
-        w=0.9,    # Start with high exploration
-        c1=2.5,   # Increase cognitive component
-        c2=1.5    # Decrease social component initially
+        n_particles=200, #Number of particles
+        w=0.9,    #Initial intertia weight
+        c1=2.5,   #Initial cognitive component value
+        c2=1.5    #Initial social component value
     )
     
-    solution = pso.optimize(max_iterations=50)
+    solution, times, distances = pso.optimize(max_iterations=50)
     
-    # Plot solution routes
-    plt.figure(figsize=(15, 5))
-    plt.subplot(121)
-    depot = problem.depot
-    customers = problem.customers
-    plt.scatter(depot.x, depot.y, c='red', marker='s', s=100, label='Depot')
-    plt.scatter([c.x for c in customers], [c.y for c in customers], 
-                c='blue', marker='o', s=50, label='Customers')
-    
-    if solution.routes:
-        cmap = plt.colormaps.get_cmap('tab10')
-        colors = [cmap(i / len(solution.routes)) for i in range(len(solution.routes))]
-        for i, route in enumerate(solution.routes):
-            route_points = [(depot.x, depot.y)] + \
-                        [(customers[c-1].x, customers[c-1].y) for c in route] + \
-                        [(depot.x, depot.y)]
-            x, y = zip(*route_points)
-            plt.plot(x, y, color=colors[i], linestyle='-', linewidth=2, 
-                    label=f'Vehicle {i+1}')
-    
-    plt.xlabel('X Coordinate')
-    plt.ylabel('Y Coordinate')
-    plt.title('PSO Solution - Vehicle Routes')
-    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.grid(True)
-
 
     # Print final statistics
     print("\nFinal Statistics:")
