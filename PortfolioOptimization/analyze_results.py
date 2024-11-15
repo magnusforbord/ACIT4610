@@ -111,8 +111,7 @@ plt.show()
 
 # --- Visualization 3: Weight Allocation Heatmap ---
 
-# Prepare data for heatmap
-# We will compute the average weight allocation for each algorithm
+# Compute the average weight allocation for each algorithm
 def extract_weights(df):
     weights_list = []
     for weights_str in df['Weights']:
@@ -155,7 +154,7 @@ sns.barplot(
     dodge=False,
     palette='magma'
 )
-plt.legend([],[], frameon=False)  # Hide the legend if not needed
+plt.legend([],[], frameon=False)
 
 plt.title('Average Training Time Comparison')
 plt.xticks(rotation=45)
@@ -166,7 +165,7 @@ plt.show()
 
 # --- Statistical Analysis: Comparing Algorithms ---
 
-# For the statistical test, we will use ANOVA to compare the 'Best Fitness' across algorithms
+# Using one-way ANOVA to compare best fitness for multiple algorithms
 from scipy.stats import f_oneway
 
 # Prepare data for ANOVA

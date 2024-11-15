@@ -14,7 +14,7 @@ os.makedirs(results_dir, exist_ok=True)
 
 # Load monthly returns
 monthly_returns = pd.read_csv(os.path.join(data_dir, 'monthly_returns.csv'), index_col=0)
-mean_returns = monthly_returns.mean().values  # Convert to numpy array
+mean_returns = monthly_returns.mean().values
 covariance_matrix = pd.read_csv(os.path.join(data_dir, 'covariance_matrix.csv'), index_col=0).values
 
 def fitness_function(weights, mean_returns):
@@ -27,8 +27,8 @@ def initialize_population(mu, num_assets):
         # Random weights summing to 1
         weights = np.random.dirichlet(np.ones(num_assets))
         # Initial mutation strengths for each weight
-        sigma = np.random.uniform(0.05, 0.2, num_assets)
-        individual = {'weights': weights, 'sigma': sigma}
+        mutation_strength = np.random.uniform(0.05, 0.2, num_assets)
+        individual = {'weights': weights, 'mutation_strength': mutation_strength}
         population.append(individual)
     return population
 
@@ -36,30 +36,30 @@ def recombine(parent1, parent2):
     num_assets = len(parent1['weights'])
     # Intermediate recombination (averaging)
     child_weights = (parent1['weights'] + parent2['weights']) / 2
-    child_sigma = (parent1['sigma'] + parent2['sigma']) / 2
+    child_mutation_strength = (parent1['mutation_strength'] + parent2['mutation_strength']) / 2
     # Ensure weights sum to 1
     child_weights /= np.sum(child_weights)
-    return {'weights': child_weights, 'sigma': child_sigma}
+    return {'weights': child_weights, 'mutation_strength': child_mutation_strength}
 
 def mutate(individual, tau, tau_prime):
     num_assets = len(individual['weights'])
     # Update mutation strengths
-    sigma = individual['sigma']
+    mutation_strength = individual['mutation_strength']
     global_mutation = np.random.normal(0, tau_prime)
     local_mutation = np.random.normal(0, tau, num_assets)
-    new_sigma = sigma * np.exp(global_mutation + local_mutation)
-    # Ensure sigma is within bounds
-    new_sigma = np.clip(new_sigma, 1e-5, 0.5)
+    new_mutation_strength = mutation_strength * np.exp(global_mutation + local_mutation)
+    # Ensure mutation_strength is within bounds
+    new_mutation_strength = np.clip(new_mutation_strength, 1e-5, 0.5)
     # Mutate weights
     weights = individual['weights']
-    weight_mutation = np.random.normal(0, new_sigma)
+    weight_mutation = np.random.normal(0, new_mutation_strength)
     new_weights = weights + weight_mutation
     # Ensure weights are non-negative and sum to 1
     new_weights = np.clip(new_weights, 0, None)
     new_weights /= np.sum(new_weights)
     # Update individual
     individual['weights'] = new_weights
-    individual['sigma'] = new_sigma
+    individual['mutation_strength'] = new_mutation_strength
     return individual
 
 def select_population(population, fitnesses, mu):
@@ -102,7 +102,6 @@ def evolution_strategies(mean_returns, num_assets, mu=20, lambda_=80, num_genera
         mean_fitness_history.append(mean_fitness)
         # Select the next generation
         population = select_population(combined_population, fitnesses, mu)
-        # print(f"Generation {generation}/{num_generations}, Best Fitness: {best_fitness:.6f}")
     # After evolution, select the best individual
     final_fitnesses = np.array([
         fitness_function(individual['weights'], mean_returns)
@@ -116,8 +115,8 @@ def evolution_strategies(mean_returns, num_assets, mu=20, lambda_=80, num_genera
     return best_individual, best_fitness, mean_fitness_final_gen
 
 if __name__ == "__main__":
-    num_runs = 30  # Number of runs
-    results = []   # List to store results from each run
+    num_runs = 30
+    results = []
 
     num_assets = len(mean_returns)
     mu = 20
